@@ -101,7 +101,7 @@ with aba_etiquetas:
     # SISTEMA DE BUSCA: Carrega dados do banco
     st.subheader("🔍 Buscar Produto Salvo")
     cursor.execute("SELECT codigo FROM produtos")
-    todos_codigos = [row for row in cursor.fetchall()]
+    todos_codigos = [row[0] for row in cursor.fetchall()]
     
     # Valores padrão iniciais caso o banco esteja vazio
     dados_carregados = {"codigo": "", "cor": "Azul Turquesa", "base": "Acrílica", "qtd": "12 Unids", "lote": "Lote B-1", "valor": "29,90"}
@@ -112,7 +112,7 @@ with aba_etiquetas:
         cursor.execute("SELECT codigo, nome_cor, base, quantidade, variacao, valor FROM produtos WHERE codigo = ?", (selecao_busca,))
         prod = cursor.fetchone()
         if prod:
-            dados_carregados = {"codigo": prod, "cor": prod, "base": prod, "qtd": prod, "lote": prod, "valor": prod}
+            dados_carregados = {"codigo": prod[0], "cor": prod[1], "base": prod[2], "qtd": prod[3], "lote": prod[4], "valor": prod[5]}
 
     st.divider()
 
@@ -123,7 +123,12 @@ with aba_etiquetas:
         modelo_selecionado = st.selectbox("Selecione o Modelo da Folha:", list(MODELOS_PIMACO.keys()))
         medidas = MODELOS_PIMACO[modelo_selecionado]
         
-        largura, altura, colunas, linhas = medidas["largura"], medidas["altura"], medidas["colunas"], medidas["linhas"]
+        largura = medidas["largura"]
+        altura = medidas["altura"]
+        colunas = medidas["colunas"]
+        linhas = medidas["linhas"]
+        
+        # LINHA CORRIGIDA DEFINITIVAMENTE AQUI:
         capacidade_maxima = colunas * linhas
         
         st.success("🎯 **Gabarito:** " + str(largura) + "mm x " + str(altura) + "mm (Máx: " + str(capacidade_maxima) + " etiquetas)")
@@ -207,6 +212,6 @@ with aba_etiquetas:
 
     html_etiquetas_completo = "".join(lista_html_final)
 
-    # Novo CSS injetado direto no corpo do site (sem iframe)
+    # Bloco CSS limpo injetado via st.html
     css_dinamico = "<style>"
     css_dinamico += "  .grade-etiquetas { display: grid; grid-template-columns: repeat(" + str(colunas) + ", " + str(largura) + "mm); gap: 1mm 3mm; padding: 5mm; background: #ffffff; border: 2px solid #ddd; border-radius: 8px; justify-content: start; width: fit-content; }"
