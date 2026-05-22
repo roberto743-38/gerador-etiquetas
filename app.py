@@ -15,7 +15,8 @@ MODELOS_PIMACO = {
     "Pimaco 6180 (63.5mm x 38.1mm - 21 etiq.)": {"largura": 63.5, "altura": 38.1, "colunas": 3, "linhas": 7}
 }
 
-col_dados, col_config = st.columns()
+# CORREÇÃO AQUI: Adicionado o número 2 para definir duas colunas na tela
+col_dados, col_config = st.columns(2)
 
 with col_config:
     st.subheader("📏 Configuração do Papel")
@@ -45,7 +46,6 @@ with col_config:
     )
     
     if modo_impressao == "Folha Completa / Múltiplas":
-        # Permite preencher a folha a partir da posição escolhida até o final
         vagas_restantes = capacidade_maxima - (posicao_inicial - 1)
         qtd_imprimir = st.number_input("Quantas etiquetas quer gerar?", min_value=1, max_value=vagas_restantes, value=vagas_restantes)
     else:
@@ -100,22 +100,19 @@ def gerar_html_etiqueta():
     </div>
     """
 
-# HTML de uma etiqueta invisível (Espaço em branco / pulado)
+# HTML de uma etiqueta invisível
 def gerar_etiqueta_vazia():
     return f'<div class="etiqueta-vazia" style="width: {largura}mm; height: {altura}mm;"></div>'
 
-# Construção da Folha misturando vazias e preenchidas
+# Construção da Folha
 lista_html_final = []
 
-# 1. Adiciona os espaços vazios para pular as etiquetas já usadas
 for _ in range(posicao_inicial - 1):
     lista_html_final.append(gerar_etiqueta_vazia())
 
-# 2. Adiciona as etiquetas que o usuário realmente quer imprimir
 for _ in range(qtd_imprimir):
     lista_html_final.append(gerar_html_etiqueta())
 
-# 3. Completa o resto da folha com vazias para manter o alinhamento do grid se necessário
 total_gerado = len(lista_html_final)
 if total_gerado < capacidade_maxima:
     for _ in range(capacidade_maxima - total_gerado):
@@ -165,7 +162,6 @@ css_e_script = f"""
     .edit:hover {{ background: #fff9c4; cursor: pointer; }}
     .bloco-preco {{ text-align: right; font-size: 10px; font-weight: bold; color: #1b5e20; height: 4mm; border-top: 1px solid #f5f5f5; }}
 
-    /* Botão de Impressão interno flutuante */
     .btn-imprimir-real {{
         background-color: #2e7d32;
         color: white;
@@ -183,11 +179,9 @@ css_e_script = f"""
     .btn-imprimir-real:hover {{ background-color: #1b5e20; }}
 
     @media print {{
-        /* Esconde absolutamente tudo da página web original */
         body *, header, footer, .stApp {{
             visibility: hidden !important;
         }}
-        /* Torna apenas a nossa grade de etiquetas visível */
         .grade-etiquetas, .grade-etiquetas * {{
             visibility: visible !important;
         }}
@@ -206,7 +200,6 @@ css_e_script = f"""
     }}
 </style>
 
-<!-- Botão que aciona a janela de impressão do sistema -->
 <button class="btn-imprimir-real" onclick="window.print()">🖨️ Clique Aqui para Imprimir Esta Folha</button>
 """
 
