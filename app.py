@@ -51,7 +51,7 @@ with aba_cadastro:
             cad_qtd = st.text_input("Quantidade Padrão")
         with c3:
             cad_lote = st.text_input("Variação / Lote")
-            cad_valor = st.text_input("Valor Padrão R\$")
+            cad_valor = st.text_input("Valor Padrão RS")
             
         botao_salvar = st.form_submit_button("💾 Salvar no Banco de Dados")
         
@@ -135,7 +135,7 @@ with aba_etiquetas:
         posicao_inicial = st.number_input(f"Começar a imprimir a partir de qual etiqueta? (1 a {capacidade_maxima})", min_value=1, max_value=capacidade_maxima, value=1)
         
         if modo_impressao == "Folha Completa / Múltiplas":
-            vagas_restantes = capacidade_maxima - (posicao_inicial - 1)
+            vagas_restantes = capacity = capacidade_maxima - (posicao_inicial - 1)
             qtd_imprimir = st.number_input("Quantas etiquetas quer gerar?", min_value=1, max_value=vagas_restantes, value=vagas_restantes)
         else:
             qtd_imprimir = 1
@@ -155,7 +155,7 @@ with aba_etiquetas:
             quantidade = st.text_input("Quantidade", value=dados_carregados["qtd"])
         with c3:
             variacao = st.text_input("Variação/Lote", value=dados_carregados["lote"])
-            valor = st.text_input("Valor R\$", value=dados_carregados["valor"])
+            valor = st.text_input("Valor RS", value=dados_carregados["valor"])
             
         data_val = st.date_input("Data de Validade", date.today())
         logo_file = st.file_uploader("Upload da Logomarca", type=["png", "jpg", "jpeg"])
@@ -188,7 +188,7 @@ with aba_etiquetas:
                     <span class="item"><span class="lbl">Data:</span><span class="edit" contenteditable="true">{data_val.strftime('%d/%m/%Y')}</span></span>
                 </div>
             </div>
-            <div class="bloco-preco">R\$ {valor}</div>
+            <div class="bloco-preco">RS {valor}</div>
         </div>
         """
 
