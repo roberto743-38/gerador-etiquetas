@@ -207,5 +207,5 @@ with aba_etiquetas:
 
     html_etiquetas_completo = "".join(lista_html_final)
 
-    # Construção manual corrigida do bloco CSS (Estilos visíveis por padrão)
+    # REORGANIZAÇÃO: CSS limpo focado exclusivamente na tela
     css_dinamico = "<style>"
