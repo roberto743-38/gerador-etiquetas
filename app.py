@@ -135,7 +135,7 @@ with aba_etiquetas:
         posicao_inicial = st.number_input(f"Começar a imprimir a partir de qual etiqueta? (1 a {capacidade_maxima})", min_value=1, max_value=capacidade_maxima, value=1)
         
         if modo_impressao == "Folha Completa / Múltiplas":
-            vagas_restantes = capacity = capacidade_maxima - (posicao_inicial - 1)
+            vagas_restantes = capacidade_maxima - (posicao_inicial - 1)
             qtd_imprimir = st.number_input("Quantas etiquetas quer gerar?", min_value=1, max_value=vagas_restantes, value=vagas_restantes)
         else:
             qtd_imprimir = 1
@@ -165,35 +165,34 @@ with aba_etiquetas:
     if logo_file is not None:
         bytes_data = logo_file.read()
         b64_logo = base64.b64encode(bytes_data).decode()
-        logo_html = f'<img src="data:image/png;base64,{b64_logo}" class="logo">'
+        logo_html = '<img src="data:image/png;base64,' + b64_logo + '" class="logo">'
     else:
         logo_html = '<div class="logo-placeholder">SUA MARCA</div>'
 
-    # Funções de geração de blocos HTML
+    # Funções de geração de blocos HTML estruturados de forma simples (sem f-string tripla)
     def gerar_html_etiqueta():
-        return f"""
-        <div class="etiqueta" style="width: {largura}mm; height: {altura}mm;">
-            <div class="bloco-superior">
-                {logo_html}
-                <div class="cod-box">{codigo}</div>
-            </div>
-            <div class="bloco-central">
-                <div class="linha">
-                    <span class="item"><span class="lbl">Cor:</span><span class="edit" contenteditable="true">{nome_cor}</span></span>
-                    <span class="item"><span class="lbl">Base:</span><span class="edit" contenteditable="true">{base}</span></span>
-                </div>
-                <div class="linha">
-                    <span class="item"><span class="lbl">Qtd:</span><span class="edit" contenteditable="true">{quantidade}</span></span>
-                    <span class="item"><span class="lbl">Lote:</span><span class="edit" contenteditable="true">{variacao}</span></span>
-                    <span class="item"><span class="lbl">Data:</span><span class="edit" contenteditable="true">{data_val.strftime('%d/%m/%Y')}</span></span>
-                </div>
-            </div>
-            <div class="bloco-preco">RS {valor}</div>
-        </div>
-        """
+        html = '<div class="etiqueta" style="width: ' + str(largura) + 'mm; height: ' + str(altura) + 'mm;">'
+        html += '    <div class="bloco-superior">'
+        html += '        ' + logo_html
+        html += '        <div class="cod-box">' + str(codigo) + '</div>'
+        html += '    </div>'
+        html += '    <div class="bloco-central">'
+        html += '        <div class="linha">'
+        html += '            <span class="item"><span class="lbl">Cor:</span><span class="edit" contenteditable="true">' + str(nome_cor) + '</span></span>'
+        html += '            <span class="item"><span class="lbl">Base:</span><span class="edit" contenteditable="true">' + str(base) + '</span></span>'
+        html += '        </div>'
+        html += '        <div class="linha">'
+        html += '            <span class="item"><span class="lbl">Qtd:</span><span class="edit" contenteditable="true">' + str(quantidade) + '</span></span>'
+        html += '            <span class="item"><span class="lbl">Lote:</span><span class="edit" contenteditable="true">' + str(variacao) + '</span></span>'
+        html += '            <span class="item"><span class="lbl">Data:</span><span class="edit" contenteditable="true">' + data_val.strftime('%d/%m/%Y') + '</span></span>'
+        html += '        </div>'
+        html += '    </div>'
+        html += '    <div class="bloco-preco">RS ' + str(valor) + '</div>'
+        html += '</div>'
+        return html
 
     def gerar_etiqueta_vazia():
-        return f'<div class="etiqueta-vazia" style="width: {largura}mm; height: {altura}mm;"></div>'
+        return '<div class="etiqueta-vazia" style="width: ' + str(largura) + 'mm; height: ' + str(altura) + 'mm;"></div>'
 
     lista_html_final = []
     for _ in range(posicao_inicial - 1):
@@ -208,8 +207,9 @@ with aba_etiquetas:
 
     html_etiquetas_completo = "".join(lista_html_final)
 
-    css_e_script = f"""
+    # Injeção segura do CSS e JavaScript separadamente
+    st.markdown("""
     <style>
-        .grade-etiquetas {{ display: grid; grid-template-columns: repeat({colunas}, {largura}mm); gap: 0.5mm 3mm; padding: 5mm; background: #f0f2f6; border-radius: 8px; justify-content: start; }}
-        .etiqueta {{ background: white; border: 1px dashed #ccc; padding: 1.5mm 2.5mm; font-family: Arial, sans-serif; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between; overflow: hidden; }}
-        .etiqueta-vazia {{ background: #e0e0e0; border: 1px dotted #bbb; box-sizing: border-box; opacity: 0.4; }}
+        @media print {
+            body *, header, footer, .stApp { visibility: hidden !important; }
+            .grade-etiquetas, .grade-etiquetas * { visibility: visible !important; }
