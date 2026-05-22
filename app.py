@@ -101,7 +101,7 @@ with aba_etiquetas:
     # SISTEMA DE BUSCA: Carrega dados do banco
     st.subheader("🔍 Buscar Produto Salvo")
     cursor.execute("SELECT codigo FROM produtos")
-    todos_codigos = [row[0] for row in cursor.fetchall()]
+    todos_codigos = [row for row in cursor.fetchall()]
     
     # Valores padrão iniciais caso o banco esteja vazio
     dados_carregados = {"codigo": "", "cor": "Azul Turquesa", "base": "Acrílica", "qtd": "12 Unids", "lote": "Lote B-1", "valor": "29,90"}
@@ -112,7 +112,7 @@ with aba_etiquetas:
         cursor.execute("SELECT codigo, nome_cor, base, quantidade, variacao, valor FROM produtos WHERE codigo = ?", (selecao_busca,))
         prod = cursor.fetchone()
         if prod:
-            dados_carregados = {"codigo": prod[0], "cor": prod[1], "base": prod[2], "qtd": prod[3], "lote": prod[4], "valor": prod[5]}
+            dados_carregados = {"codigo": prod, "cor": prod, "base": prod, "qtd": prod, "lote": prod, "valor": prod}
 
     st.divider()
 
@@ -169,7 +169,7 @@ with aba_etiquetas:
     else:
         logo_html = '<div class="logo-placeholder">SUA MARCA</div>'
 
-    # Funções de geração de blocos HTML estruturados linha por linha
+    # Funções de geração de blocos HTML estruturados
     def gerar_html_etiqueta():
         html = '<div class="etiqueta" style="width: ' + str(largura) + 'mm; height: ' + str(altura) + 'mm;">'
         html += '    <div class="bloco-superior">'
@@ -207,6 +207,5 @@ with aba_etiquetas:
 
     html_etiquetas_completo = "".join(lista_html_final)
 
-    # Construção de todo o CSS e botão de forma 100% linear livre de aspas triplas
+    # Construção manual corrigida do bloco CSS (Estilos visíveis por padrão)
     css_dinamico = "<style>"
-    css_dinamico += "  body *, header, footer, .stApp { visibility: hidden !important; }"
