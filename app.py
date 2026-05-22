@@ -1,37 +1,20 @@
 import streamlit as st
 import base64
-import sqlite3
 from datetime import date
 
 # Configuração da página
 st.set_page_config(page_title="Gerador Pimaco Avançado", layout="wide")
 
 # -------------------------------------------------------------------------
-# CONFIGURAÇÃO DO BANCO DE DADOS (SQLite)
+# BANCO DE DADOS EM MEMÓRIA (Session State - À prova de falhas na nuvem)
 # -------------------------------------------------------------------------
-def conectar_banco():
-    conn = sqlite3.connect("produtos.db")
-    cursor = conn.cursor()
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS produtos (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            codigo TEXT UNIQUE,
-            nome_cor TEXT,
-            quantidade TEXT,
-            base TEXT,
-            variacao TEXT,
-            valor TEXT
-        )
-    """)
-    conn.commit()
-    return conn, cursor
-
-conn, cursor = conectar_banco()
+if "banco_produtos" not in st.session_state:
+    st.session_state["banco_produtos"] = {}
 
 # -------------------------------------------------------------------------
 # INTERFACE PRINCIPAL
 # -------------------------------------------------------------------------
-st.title("🏷️ Gerador Pimaco A4354 com Banco de Dados")
+st.title("🏷️ Gerador Pimaco A4354 Profissional")
 
 # Criação de Abas para organizar o sistema
 aba_etiquetas, aba_cadastro = st.tabs(["🖨️ Gerar Etiquetas", "📦 Cadastrar / Gerenciar Produtos"])
@@ -53,39 +36,31 @@ with aba_cadastro:
             cad_lote = st.text_input("Variação / Lote")
             cad_valor = st.text_input("Valor Padrão RS")
             
-        botao_salvar = st.form_submit_button("💾 Salvar no Banco de Dados")
+        botao_salvar = st.form_submit_button("💾 Salvar Produto")
         
         if botao_salvar:
             if not cad_codigo:
                 st.error("O campo 'Código do Produto' é obrigatório!")
             else:
-                try:
-                    cursor.execute("""
-                        INSERT INTO produtos (codigo, nome_cor, quantidade, base, variacao, valor)
-                        VALUES (?, ?, ?, ?, ?, ?)
-                    """, (cad_codigo, cad_cor, cad_qtd, cad_base, cad_lote, cad_valor))
-                    conn.commit()
-                    st.success("Produto " + str(cad_codigo) + " cadastrado com sucesso!")
-                    st.rerun()
-                except sqlite3.IntegrityError:
-                    st.error("Este código de produto já existe no banco de dados!")
+                st.session_state["banco_produtos"][cad_codigo] = {
+                    "codigo": cad_codigo,
+                    "cor": cad_cor,
+                    "base": cad_base,
+                    "qtd": cad_qtd,
+                    "lote": cad_lote,
+                    "valor": cad_valor
+                }
+                st.success("Produto " + str(cad_codigo) + " salvo com sucesso!")
+                st.rerun()
 
     # Visualizar produtos cadastrados
     st.divider()
-    st.subheader("📋 Produtos Salvos")
-    cursor.execute("SELECT codigo, nome_cor, base, quantidade, variacao, valor FROM produtos")
-    lista_produtos = cursor.fetchall()
-    
-    if lista_produtos:
-        st.dataframe(
-            lista_produtos, 
-            column_config={
-                "0": "Código", "1": "Cor", "2": "Base", "3": "Quantidade", "4": "Lote", "5": "Valor"
-            },
-            use_container_width=True
-        )
+    st.subheader("📋 Produtos Salvos Temporariamente")
+    if st.session_state["banco_produtos"]:
+        dados_tabela = list(st.session_state["banco_produtos"].values())
+        st.dataframe(dados_tabela, use_container_width=True)
     else:
-        st.info("Nenhum produto cadastrado ainda.")
+        st.info("Nenhum produto cadastrado nesta sessão ainda.")
 
 # -------------------------------------------------------------------------
 # ABA 1: GERADOR DE ETIQUETAS
@@ -98,21 +73,17 @@ with aba_etiquetas:
         "Pimaco 6180 (63.5mm x 38.1mm - 21 etiq.)": {"largura": 63.5, "altura": 38.1, "colunas": 3, "linhas": 7}
     }
 
-    # SISTEMA DE BUSCA: Carrega dados do banco
+    # SISTEMA DE BUSCA: Carrega dados salvos
     st.subheader("🔍 Buscar Produto Salvo")
-    cursor.execute("SELECT codigo FROM produtos")
-    todos_codigos = [row[0] for row in cursor.fetchall()]
+    todos_codigos = list(st.session_state["banco_produtos"].keys())
     
-    # Valores padrão iniciais caso o banco esteja vazio
     dados_carregados = {"codigo": "", "cor": "Azul Turquesa", "base": "Acrílica", "qtd": "12 Unids", "lote": "Lote B-1", "valor": "29,90"}
     
-    selecao_busca = st.selectbox("Escolha um produto cadastrado para preencher os campos abaixo automaticamente:", ["-- Selecione um Código --"] + todos_codigos)
+    selecao_busca = st.selectbox("Escolha um produto para preencher automaticamente:", ["-- Selecione um Código --"] + todos_codigos)
     
     if selecao_busca != "-- Selecione um Código --":
-        cursor.execute("SELECT codigo, nome_cor, base, quantidade, variacao, valor FROM produtos WHERE codigo = ?", (selecao_busca,))
-        prod = cursor.fetchone()
-        if prod:
-            dados_carregados = {"codigo": prod[0], "cor": prod[1], "base": prod[2], "qtd": prod[3], "lote": prod[4], "valor": prod[5]}
+        prod = st.session_state["banco_produtos"][selecao_busca]
+        dados_carregados = {"codigo": prod["codigo"], "cor": prod["cor"], "base": prod["base"], "qtd": prod["qtd"], "lote": prod["lote"], "valor": prod["valor"]}
 
     st.divider()
 
@@ -129,7 +100,7 @@ with aba_etiquetas:
         linhas = medidas["linhas"]
         capacidade_maxima = colunas * linhas
         
-        st.success("🎯 **Gabarito:** " + str(largura) + "mm x " + str(altura) + "mm (Máx: " + str(capacidade_maxima) + " etiquetas)")
+        st.success("Gabarito Ativo: " + str(largura) + "mm x " + str(altura) + "mm")
 
         st.divider()
         st.subheader("🖨️ Opções de Posição")
@@ -168,26 +139,26 @@ with aba_etiquetas:
     if logo_file is not None:
         bytes_data = logo_file.read()
         b64_logo = base64.b64encode(bytes_data).decode()
-        logo_html = '<img src="data:image/png;base64,' + b64_logo + '" class="logo">'
+        logo_html = '<img src="data:image/png;base64,' + b64_logo + '" style="max-height: 5.5mm; max-width: 35mm; object-fit: contain;">'
     else:
-        logo_html = '<div class="logo-placeholder">SUA MARCA</div>'
+        logo_html = '<div style="font-size: 7px; color: #aaa; font-weight: bold; border: 1px dotted #ddd; padding: 1px 3px;">SUA MARCA</div>'
 
-    # Funções de geração de blocos HTML estruturados
+    # Funções de geração de blocos HTML estruturados básicos
     def gerar_html_etiqueta():
-        html = '<div class="etiqueta" style="width: ' + str(largura) + 'mm; height: ' + str(altura) + 'mm; background: white; border: 1px dashed #bbb; padding: 1.5mm 2.5mm; font-family: Arial, sans-serif; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between; overflow: hidden;">'
+        html = '<div style="width: ' + str(largura) + 'mm; height: ' + str(altura) + 'mm; background: white; border: 1px dashed #bbb; padding: 1.5mm 2.5mm; font-family: Arial, sans-serif; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between; overflow: hidden;">'
         html += '    <div style="display: flex; justify-content: space-between; align-items: center; height: 6mm;">'
         html += '        ' + logo_html
         html += '        <div style="font-size: ' + str(tamanho_fonte - 1) + 'px; font-weight: bold; background: #333; color: #fff; padding: 0.5px 3px; border-radius: 2px;">' + str(codigo) + '</div>'
         html += '    </div>'
         html += '    <div style="display: flex; flex-direction: column; justify-content: center; height: 11mm;">'
         html += '        <div style="display: flex; justify-content: space-between; font-size: ' + str(tamanho_fonte) + 'px; margin-bottom: 0.5mm; color: black;">'
-        html += '            <span class="item"><b>Cor:</b> ' + str(nome_cor) + '</span>'
-        html += '            <span class="item"><b>Base:</b> ' + str(base) + '</span>'
+        html += '            <span><b>Cor:</b> ' + str(nome_cor) + '</span>'
+        html += '            <span><b>Base:</b> ' + str(base) + '</span>'
         html += '        </div>'
         html += '        <div style="display: flex; justify-content: space-between; font-size: ' + str(tamanho_fonte) + 'px; margin-bottom: 0.5mm; color: black;">'
-        html += '            <span class="item"><b>Qtd:</b> ' + str(quantidade) + '</span>'
-        html += '            <span class="item"><b>Lote:</b> ' + str(variacao) + '</span>'
-        html += '            <span class="item"><b>Data:</b> ' + data_val.strftime('%d/%m/%Y') + '</span>'
+        html += '            <span><b>Qtd:</b> ' + str(quantidade) + '</span>'
+        html += '            <span><b>Lote:</b> ' + str(variacao) + '</span>'
+        html += '            <span><b>Data:</b> ' + data_val.strftime('%d/%m/%Y') + '</span>'
         html += '        </div>'
         html += '    </div>'
         html += '    <div style="text-align: right; font-size: ' + str(tamanho_fonte + 2) + 'px; font-weight: bold; color: #1b5e20; height: 4mm; border-top: 1px solid #f5f5f5;">RS ' + str(valor) + '</div>'
@@ -195,7 +166,7 @@ with aba_etiquetas:
         return html
 
     def gerar_etiqueta_vazia():
-        return '<div style="width: ' + str(largura) + 'mm; height: ' + str(altura) + 'mm; background: #e0e0e0; border: 1px dotted #bbb; opacity: 0.5; box-sizing: border-box;"></div>'
+        return '<div style="width: ' + str(largura) + 'mm; height: ' + str(altura) + 'mm; background: #f0f2f6; border: 1px dotted #ccc; box-sizing: border-box;"></div>'
 
     lista_html_final = []
     for _ in range(posicao_inicial - 1):
@@ -203,3 +174,21 @@ with aba_etiquetas:
     for _ in range(qtd_imprimir):
         lista_html_final.append(gerar_html_etiqueta())
         
+    total_gerado = len(lista_html_final)
+    if total_gerado < capacidade_maxima:
+        for _ in range(capacidade_maxima - total_gerado):
+            lista_html_final.append(gerar_etiqueta_vazia())
+
+    html_etiquetas_completo = "".join(lista_html_final)
+
+    # Monta a grade com estilos 100% visíveis na tela
+    estilo_grade = 'display: grid; grid-template-columns: repeat(' + str(colunas) + ', ' + str(largura) + 'mm); gap: 1mm 3mm; padding: 5mm; background: #ffffff; border: 2px solid #ddd; border-radius: 8px; justify-content: start; width: fit-content;'
+    html_final_tela = '<div style="' + estilo_grade + '">' + html_etiquetas_completo + '</div>'
+
+    st.subheader("👁️ Visualização da Folha")
+    
+    # Exibição segura de código HTML puro na tela
+    st.components.v1.html(html_final_tela, height=450, scrolling=True)
+
+    # -------------------------------------------------------------------------
+    # SISTEMA DE IMPRESSÃO VIA DOWNLOAD DE PAGINA EXTERNA
