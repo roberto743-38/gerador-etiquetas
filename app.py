@@ -26,7 +26,9 @@ with col_config:
     altura = medidas["altura"]
     colunas = medidas["colunas"]
     linhas = medidas["linhas"]
-    capacidade_maxima = colunas * lines = colunas * linhas
+    
+    # LINHA CORRIGIDA AQUI:
+    capacidade_maxima = colunas * linhas
     
     st.success(f"🎯 **Gabarito:** {largura}mm x {altura}mm (Máx: {capacidade_maxima} etiquetas)")
 
@@ -48,7 +50,7 @@ with col_config:
     else:
         qtd_imprimir = 1
 
-    # NOVA FUNÇÃO: Controle do tamanho da fonte das letras (em pixels)
+    # Controle do tamanho da fonte das letras
     st.divider()
     st.subheader("🔤 Ajuste do Texto")
     tamanho_fonte = st.slider("Tamanho da letra das informações (pixels):", min_value=7, max_value=14, value=9, step=1)
@@ -159,7 +161,6 @@ css_e_script = f"""
     
     .bloco-central {{ display: flex; flex-direction: column; justify-content: center; height: 11mm; }}
     
-    /* Configuração dinâmica do tamanho das fontes do conteúdo central */
     .linha {{ 
         display: flex; 
         justify-content: space-between; 
@@ -170,7 +171,6 @@ css_e_script = f"""
     .lbl {{ font-weight: bold; color: #444; margin-right: 1px; }}
     .edit:hover {{ background: #fff9c4; cursor: pointer; }}
     
-    /* Preço acompanha o crescimento da fonte proporcionalmente */
     .bloco-preco {{ 
         text-align: right; 
         font-size: {tamanho_fonte + 1.5}px; 
