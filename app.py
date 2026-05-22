@@ -1,91 +1,51 @@
 import streamlit as st
 import base64
-from datetime import date
+from datetime import datetime, date
+from streamlit_gsheets import GSheetsConnection
+import pandas as pd
 
 # Configuração da página
-st.set_page_config(page_title="Gerador Pimaco Avançado", layout="wide")
+st.set_page_config(page_title="Gerador Pimaco Profissional", layout="wide")
 
 # -------------------------------------------------------------------------
-# BANCO DE DADOS EM MEMÓRIA (Session State - À prova de falhas na nuvem)
+# CONEXÃO COM O BANCO DE DADOS (Google Sheets Permanente)
 # -------------------------------------------------------------------------
-if "banco_produtos" not in st.session_state:
-    st.session_state["banco_produtos"] = {}
+# Se não estiver configurado na nuvem, criamos um banco temporário para não travar a tela
+try:
+    conn = st.connection("gsheets", type=GSheetsConnection)
+    df_banco = conn.read(ttl="0")
+    banco_ativo = True
+except Exception:
+    banco_ativo = False
+    if "banco_reserva" not in st.session_state:
+        st.session_state["banco_reserva"] = pd.DataFrame(columns=["Data_Hora", "Codigo", "Cor", "Base", "Quantidade", "Lote", "Valor"])
+    df_banco = st.session_state["banco_reserva"]
 
 # -------------------------------------------------------------------------
 # INTERFACE PRINCIPAL
 # -------------------------------------------------------------------------
-st.title("🏷️ Gerador Pimaco A4354 Profissional")
+st.title("🏷️ Gerador Pimaco A4354 com Histórico de Impressão")
 
-# Criação de Abas para organizar o sistema
-aba_etiquetas, aba_cadastro = st.tabs(["🖨️ Gerar Etiquetas", "📦 Cadastrar / Gerenciar Produtos"])
+aba_etiquetas, aba_historico = st.tabs(["🖨️ Gerar e Imprimir", "📜 Histórico de Etiquetas Impressas"])
 
 # -------------------------------------------------------------------------
-# ABA 2: CADASTRO DE PRODUTOS
+# ABA 2: HISTÓRICO DE IMPRESSÕES
 # -------------------------------------------------------------------------
-with aba_cadastro:
-    st.subheader("📝 Cadastrar Novo Produto")
-    with st.form("form_cadastro", clear_on_submit=True):
-        c1, c2, c3 = st.columns(3)
-        with c1:
-            cad_codigo = st.text_input("Código do Produto (Único)*")
-            cad_cor = st.text_input("Nome da Cor")
-        with c2:
-            cad_base = st.text_input("Base")
-            cad_qtd = st.text_input("Quantidade Padrão")
-        with c3:
-            cad_lote = st.text_input("Variação / Lote")
-            cad_valor = st.text_input("Valor Padrão RS")
-            
-        botao_salvar = st.form_submit_button("💾 Salvar Produto")
-        
-        if botao_salvar:
-            if not cad_codigo:
-                st.error("O campo 'Código do Produto' é obrigatório!")
-            else:
-                st.session_state["banco_produtos"][cad_codigo] = {
-                    "codigo": cad_codigo,
-                    "cor": cad_cor,
-                    "base": cad_base,
-                    "qtd": cad_qtd,
-                    "lote": cad_lote,
-                    "valor": cad_valor
-                }
-                st.success("Produto " + str(cad_codigo) + " salvo com sucesso!")
-                st.rerun()
-
-    # Visualizar produtos cadastrados
-    st.divider()
-    st.subheader("📋 Produtos Salvos Temporariamente")
-    if st.session_state["banco_produtos"]:
-        dados_tabela = list(st.session_state["banco_produtos"].values())
-        st.dataframe(dados_tabela, use_container_width=True)
+with aba_historico:
+    st.subheader("📋 Relatório de Etiquetas Já Emitidas")
+    if not df_banco.empty:
+        st.dataframe(df_banco, use_container_width=True, hide_index=True)
     else:
-        st.info("Nenhum produto cadastrado nesta sessão ainda.")
+        st.info("Nenhuma etiqueta foi impressa ou registrada ainda.")
 
 # -------------------------------------------------------------------------
 # ABA 1: GERADOR DE ETIQUETAS
 # -------------------------------------------------------------------------
 with aba_etiquetas:
-    # Banco de dados de folhas Pimaco
     MODELOS_PIMACO = {
         "Pimaco A4354 (25.4mm x 99.0mm - 22 etiq.)": {"largura": 99.0, "altura": 25.4, "colunas": 2, "linhas": 11},
-        "Personalizado (Definir Manualmente)": {"largura": 80.0, "altura": 40.0, "colunas": 2, "linhas": 6},
-        "Pimaco 6180 (63.5mm x 38.1mm - 21 etiq.)": {"largura": 63.5, "altura": 38.1, "colunas": 3, "linhas": 7}
+        "Personalizado (Definir Manualmente)": {"largura": 80.0, "altura": 40.0, "colunas": 2, "linhas": 6}
     }
-
-    # SISTEMA DE BUSCA: Carrega dados salvos
-    st.subheader("🔍 Buscar Produto Salvo")
-    todos_codigos = list(st.session_state["banco_produtos"].keys())
-    
-    dados_carregados = {"codigo": "", "cor": "Azul Turquesa", "base": "Acrílica", "qtd": "12 Unids", "lote": "Lote B-1", "valor": "29,90"}
-    
-    selecao_busca = st.selectbox("Escolha um produto para preencher automaticamente:", ["-- Selecione um Código --"] + todos_codigos)
-    
-    if selecao_busca != "-- Selecione um Código --":
-        prod = st.session_state["banco_produtos"][selecao_busca]
-        dados_carregados = {"codigo": prod["codigo"], "cor": prod["cor"], "base": prod["base"], "qtd": prod["qtd"], "lote": prod["lote"], "valor": prod["valor"]}
-
-    st.divider()
 
     col_dados, col_config = st.columns(2)
 
@@ -94,10 +54,7 @@ with aba_etiquetas:
         modelo_selecionado = st.selectbox("Selecione o Modelo da Folha:", list(MODELOS_PIMACO.keys()))
         medidas = MODELOS_PIMACO[modelo_selecionado]
         
-        largura = medidas["largura"]
-        altura = medidas["altura"]
-        colunas = medidas["colunas"]
-        linhas = medidas["linhas"]
+        largura, altura, colunas, linhas = medidas["largura"], medidas["altura"], medidas["colunas"], medidas["linhas"]
         capacidade_maxima = colunas * linhas
         
         st.success("Gabarito Ativo: " + str(largura) + "mm x " + str(altura) + "mm")
@@ -105,7 +62,6 @@ with aba_etiquetas:
         st.divider()
         st.subheader("🖨️ Opções de Posição")
         modo_impressao = st.radio("Formato:", ["Folha Completa / Múltiplas", "Apenas 1 Etiqueta Avançada"])
-        
         posicao_inicial = st.number_input("Começar a imprimir a partir de qual etiqueta?", min_value=1, max_value=capacidade_maxima, value=1)
         
         if modo_impressao == "Folha Completa / Múltiplas":
@@ -116,20 +72,20 @@ with aba_etiquetas:
 
         st.divider()
         st.subheader("🔤 Ajuste do Texto")
-        tamanho_fonte = st.slider("Tamanho da letra das informações (pixels):", min_value=7, max_value=14, value=10, step=1)
+        tamanho_fonte = st.slider("Tamanho da letra (pixels):", min_value=7, max_value=14, value=10, step=1)
 
     with col_dados:
         st.subheader("📝 Informações da Etiqueta")
         c1, c2, c3 = st.columns(3)
         with c1:
-            codigo = st.text_input("Código", value=dados_carregados["codigo"])
-            nome_cor = st.text_input("Nome da Cor", value=dados_carregados["cor"])
+            codigo = st.text_input("Código", value="REF-1020")
+            nome_cor = st.text_input("Nome da Cor", value="Azul Turquesa")
         with c2:
-            base = st.text_input("Base", value=dados_carregados["base"])
-            quantidade = st.text_input("Quantidade", value=dados_carregados["qtd"])
+            base = st.text_input("Base", value="Acrílica")
+            quantidade = st.text_input("Quantidade", value="12 Unids")
         with c3:
-            variacao = st.text_input("Variação/Lote", value=dados_carregados["lote"])
-            valor = st.text_input("Valor RS", value=dados_carregados["valor"])
+            variacao = st.text_input("Variação/Lote", value="Lote B-1")
+            valor = st.text_input("Valor RS", value="29,90")
             
         data_val = st.date_input("Data de Validade", date.today())
         logo_file = st.file_uploader("Upload da Logomarca", type=["png", "jpg", "jpeg"])
@@ -143,7 +99,7 @@ with aba_etiquetas:
     else:
         logo_html = '<div style="font-size: 7px; color: #aaa; font-weight: bold; border: 1px dotted #ddd; padding: 1px 3px;">SUA MARCA</div>'
 
-    # Funções de geração de blocos HTML estruturados básicos
+    # Geração das etiquetas em HTML
     def gerar_html_etiqueta():
         html = '<div style="width: ' + str(largura) + 'mm; height: ' + str(altura) + 'mm; background: white; border: 1px dashed #bbb; padding: 1.5mm 2.5mm; font-family: Arial, sans-serif; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between; overflow: hidden;">'
         html += '    <div style="display: flex; justify-content: space-between; align-items: center; height: 6mm;">'
@@ -181,14 +137,41 @@ with aba_etiquetas:
 
     html_etiquetas_completo = "".join(lista_html_final)
 
-    # Monta a grade com estilos 100% visíveis na tela
     estilo_grade = 'display: grid; grid-template-columns: repeat(' + str(colunas) + ', ' + str(largura) + 'mm); gap: 1mm 3mm; padding: 5mm; background: #ffffff; border: 2px solid #ddd; border-radius: 8px; justify-content: start; width: fit-content;'
     html_final_tela = '<div style="' + estilo_grade + '">' + html_etiquetas_completo + '</div>'
 
     st.subheader("👁️ Visualização da Folha")
-    
-    # Exibição segura de código HTML puro na tela
     st.components.v1.html(html_final_tela, height=450, scrolling=True)
 
     # -------------------------------------------------------------------------
-    # SISTEMA DE IMPRESSÃO VIA DOWNLOAD DE PAGINA EXTERNA
+    # SALVAMENTO E IMPRESSÃO (Disparado pelo botão)
+    # -------------------------------------------------------------------------
+    st.divider()
+    st.subheader("🖨️ Salvar e Imprimir")
+    
+    html_impressao = '<html><body onload="window.print()"><div style="display: grid; grid-template-columns: repeat(' + str(colunas) + ', ' + str(largura) + 'mm); gap: 0mm 3.5mm; position: absolute; left: 4mm; top: 10mm;">' + html_etiquetas_completo.replace('background: #f0f2f6; border: 1px dotted #ccc;', 'background: transparent; border: none;') + '</div></body></html>'
+    
+    # Novo Botão Único que executa a ação de Salvar no Banco antes de liberar a impressão
+    if st.button("💾 Registrar no Histórico e Gerar Impressão"):
+        novo_registro = {
+            "Data_Hora": datetime.now().strftime("%d/%m/%Y %H:%M"),
+            "Codigo": codigo,
+            "Cor": nome_cor,
+            "Base": base,
+            "Quantidade": quantidade,
+            "Lote": variacao,
+            "Valor": valor
+        }
+        
+        if banco_ativo:
+            df_atualizado = pd.concat([df_banco, pd.DataFrame([novo_registro])], ignore_index=True)
+            conn.update(data=df_atualizado)
+        else:
+            st.session_state["banco_reserva"] = pd.concat([st.session_state["banco_reserva"], pd.DataFrame([novo_registro])], ignore_index=True)
+            
+        st.success("Sucesso! Dados gravados no histórico.")
+        
+        # Cria um link invisível para o usuário baixar a folha que foi salva
+        b64 = base64.b64encode(html_impressao.encode()).decode()
+        link_html = '<a id="download_link" href="data:text/html;base64,' + b64 + '" download="folha_etiquetas.html" style="display:none;"></a><script>document.getElementById("download_link").click();</script>'
+        st.components.v1.html(link_html, height=0)
