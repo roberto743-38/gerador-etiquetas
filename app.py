@@ -65,7 +65,7 @@ with aba_cadastro:
                         VALUES (?, ?, ?, ?, ?, ?)
                     """, (cad_codigo, cad_cor, cad_qtd, cad_base, cad_lote, cad_valor))
                     conn.commit()
-                    st.success(f"Produto {cad_codigo} cadastrado com sucesso!")
+                    st.success("Produto " + str(cad_codigo) + " cadastrado com sucesso!")
                     st.rerun()
                 except sqlite3.IntegrityError:
                     st.error("Este código de produto já existe no banco de dados!")
@@ -126,13 +126,13 @@ with aba_etiquetas:
         largura, altura, colunas, linhas = medidas["largura"], medidas["altura"], medidas["colunas"], medidas["linhas"]
         capacidade_maxima = colunas * linhas
         
-        st.success(f"🎯 **Gabarito:** {largura}mm x {altura}mm (Máx: {capacidade_maxima} etiquetas)")
+        st.success("🎯 **Gabarito:** " + str(largura) + "mm x " + str(altura) + "mm (Máx: " + str(capacidade_maxima) + " etiquetas)")
 
         st.divider()
         st.subheader("🖨️ Opções de Posição")
         modo_impressao = st.radio("Formato:", ["Folha Completa / Múltiplas", "Apenas 1 Etiqueta Avançada"])
         
-        posicao_inicial = st.number_input(f"Começar a imprimir a partir de qual etiqueta? (1 a {capacidade_maxima})", min_value=1, max_value=capacidade_maxima, value=1)
+        posicao_inicial = st.number_input("Começar a imprimir a partir de qual etiqueta? (1 a " + str(capacidade_maxima) + ")", min_value=1, max_value=capacidade_maxima, value=1)
         
         if modo_impressao == "Folha Completa / Múltiplas":
             vagas_restantes = capacidade_maxima - (posicao_inicial - 1)
@@ -169,7 +169,7 @@ with aba_etiquetas:
     else:
         logo_html = '<div class="logo-placeholder">SUA MARCA</div>'
 
-    # Funções de geração de blocos HTML estruturados de forma simples (sem f-string tripla)
+    # Funções de geração de blocos HTML estruturados linha por linha
     def gerar_html_etiqueta():
         html = '<div class="etiqueta" style="width: ' + str(largura) + 'mm; height: ' + str(altura) + 'mm;">'
         html += '    <div class="bloco-superior">'
@@ -207,9 +207,6 @@ with aba_etiquetas:
 
     html_etiquetas_completo = "".join(lista_html_final)
 
-    # Injeção segura do CSS e JavaScript separadamente
-    st.markdown("""
-    <style>
-        @media print {
-            body *, header, footer, .stApp { visibility: hidden !important; }
-            .grade-etiquetas, .grade-etiquetas * { visibility: visible !important; }
+    # Construção de todo o CSS e botão de forma 100% linear livre de aspas triplas
+    css_dinamico = "<style>"
+    css_dinamico += "  body *, header, footer, .stApp { visibility: hidden !important; }"
