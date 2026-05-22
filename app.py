@@ -4,7 +4,7 @@ import sqlite3
 from datetime import date
 
 # Configuração da página
-st.set_page_config(page_title="Gerador Pimaco com Banco de Dados", layout="wide")
+st.set_page_config(page_title="Gerador Pimaco Avançado", layout="wide")
 
 # -------------------------------------------------------------------------
 # CONFIGURAÇÃO DO BANCO DE DADOS (SQLite)
@@ -132,7 +132,7 @@ with aba_etiquetas:
         st.subheader("🖨️ Opções de Posição")
         modo_impressao = st.radio("Formato:", ["Folha Completa / Múltiplas", "Apenas 1 Etiqueta Avançada"])
         
-        posicao_inicial = st.number_input("Começar a imprimir a partir de qual etiqueta? (1 a " + str(capacidade_maxima) + ")", min_value=1, max_value=capacidade_maxima, value=1)
+        posicao_inicial = st.number_input("Começar a imprimir a partir de qual etiqueta?", min_value=1, max_value=capacidade_maxima, value=1)
         
         if modo_impressao == "Folha Completa / Múltiplas":
             vagas_restantes = capacidade_maxima - (posicao_inicial - 1)
@@ -142,7 +142,7 @@ with aba_etiquetas:
 
         st.divider()
         st.subheader("🔤 Ajuste do Texto")
-        tamanho_fonte = st.slider("Tamanho da letra das informações (pixels):", min_value=7, max_value=14, value=9, step=1)
+        tamanho_fonte = st.slider("Tamanho da letra das informações (pixels):", min_value=7, max_value=14, value=10, step=1)
 
     with col_dados:
         st.subheader("📝 Informações da Etiqueta")
@@ -178,13 +178,13 @@ with aba_etiquetas:
         html += '    </div>'
         html += '    <div class="bloco-central">'
         html += '        <div class="linha">'
-        html += '            <span class="item"><span class="lbl">Cor:</span><span class="edit" contenteditable="true">' + str(nome_cor) + '</span></span>'
-        html += '            <span class="item"><span class="lbl">Base:</span><span class="edit" contenteditable="true">' + str(base) + '</span></span>'
+        html += '            <span class="item"><span class="lbl">Cor:</span><span class="edit">' + str(nome_cor) + '</span></span>'
+        html += '            <span class="item"><span class="lbl">Base:</span><span class="edit">' + str(base) + '</span></span>'
         html += '        </div>'
         html += '        <div class="linha">'
-        html += '            <span class="item"><span class="lbl">Qtd:</span><span class="edit" contenteditable="true">' + str(quantidade) + '</span></span>'
-        html += '            <span class="item"><span class="lbl">Lote:</span><span class="edit" contenteditable="true">' + str(variacao) + '</span></span>'
-        html += '            <span class="item"><span class="lbl">Data:</span><span class="edit" contenteditable="true">' + data_val.strftime('%d/%m/%Y') + '</span></span>'
+        html += '            <span class="item"><span class="lbl">Qtd:</span><span class="edit">' + str(quantidade) + '</span></span>'
+        html += '            <span class="item"><span class="lbl">Lote:</span><span class="edit">' + str(variacao) + '</span></span>'
+        html += '            <span class="item"><span class="lbl">Data:</span><span class="edit">' + data_val.strftime('%d/%m/%Y') + '</span></span>'
         html += '        </div>'
         html += '    </div>'
         html += '    <div class="bloco-preco">RS ' + str(valor) + '</div>'
@@ -207,5 +207,6 @@ with aba_etiquetas:
 
     html_etiquetas_completo = "".join(lista_html_final)
 
-    # REORGANIZAÇÃO: CSS limpo focado exclusivamente na tela
+    # Novo CSS injetado direto no corpo do site (sem iframe)
     css_dinamico = "<style>"
+    css_dinamico += "  .grade-etiquetas { display: grid; grid-template-columns: repeat(" + str(colunas) + ", " + str(largura) + "mm); gap: 1mm 3mm; padding: 5mm; background: #ffffff; border: 2px solid #ddd; border-radius: 8px; justify-content: start; width: fit-content; }"
