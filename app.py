@@ -6,7 +6,7 @@ from datetime import date
 st.set_page_config(page_title="Gerador Pimaco Avançado", layout="wide")
 
 st.title("🏷️ Gerador Profissional - Gabarito Pimaco A4354")
-st.write("Agora com controle de posição de início para reaproveitamento de folhas!")
+st.write("Agora com controle de posição e ajuste dinâmico do tamanho das letras!")
 
 # Banco de dados Pimaco
 MODELOS_PIMACO = {
@@ -15,7 +15,6 @@ MODELOS_PIMACO = {
     "Pimaco 6180 (63.5mm x 38.1mm - 21 etiq.)": {"largura": 63.5, "altura": 38.1, "colunas": 3, "linhas": 7}
 }
 
-# CORREÇÃO AQUI: Adicionado o número 2 para definir duas colunas na tela
 col_dados, col_config = st.columns(2)
 
 with col_config:
@@ -27,7 +26,7 @@ with col_config:
     altura = medidas["altura"]
     colunas = medidas["colunas"]
     linhas = medidas["linhas"]
-    capacidade_maxima = colunas * linhas
+    capacidade_maxima = colunas * lines = colunas * linhas
     
     st.success(f"🎯 **Gabarito:** {largura}mm x {altura}mm (Máx: {capacidade_maxima} etiquetas)")
 
@@ -36,13 +35,11 @@ with col_config:
     
     modo_impressao = st.radio("Formato:", ["Folha Completa / Múltiplas", "Apenas 1 Etiqueta Avançada"])
     
-    # Nova função: Seleção de Posição Inicial
     posicao_inicial = st.number_input(
         f"Começar a imprimir a partir de qual etiqueta? (1 a {capacidade_maxima})", 
         min_value=1, 
         max_value=capacidade_maxima, 
-        value=1,
-        help="Se você já usou as primeiras etiquetas da folha, mude este número para pular os espaços vazios!"
+        value=1
     )
     
     if modo_impressao == "Folha Completa / Múltiplas":
@@ -50,6 +47,11 @@ with col_config:
         qtd_imprimir = st.number_input("Quantas etiquetas quer gerar?", min_value=1, max_value=vagas_restantes, value=vagas_restantes)
     else:
         qtd_imprimir = 1
+
+    # NOVA FUNÇÃO: Controle do tamanho da fonte das letras (em pixels)
+    st.divider()
+    st.subheader("🔤 Ajuste do Texto")
+    tamanho_fonte = st.slider("Tamanho da letra das informações (pixels):", min_value=7, max_value=14, value=9, step=1)
 
 with col_dados:
     st.subheader("📝 Informações do Produto")
@@ -100,11 +102,9 @@ def gerar_html_etiqueta():
     </div>
     """
 
-# HTML de uma etiqueta invisível
 def gerar_etiqueta_vazia():
     return f'<div class="etiqueta-vazia" style="width: {largura}mm; height: {altura}mm;"></div>'
 
-# Construção da Folha
 lista_html_final = []
 
 for _ in range(posicao_inicial - 1):
@@ -120,7 +120,7 @@ if total_gerado < capacidade_maxima:
 
 html_etiquetas_completo = "".join(lista_html_final)
 
-# Estilização CSS e Script de Impressão Direta
+# Estilização CSS incluindo a variável dinâmica do tamanho da fonte
 css_e_script = f"""
 <style>
     .grade-etiquetas {{
@@ -155,12 +155,30 @@ css_e_script = f"""
     .bloco-superior {{ display: flex; justify-content: space-between; align-items: center; height: 6mm; }}
     .logo {{ max-height: 5.5mm; max-width: 35mm; object-fit: contain; }}
     .logo-placeholder {{ font-size: 7px; color: #aaa; font-weight: bold; border: 1px dotted #ddd; padding: 1px 3px; }}
-    .cod-box {{ font-size: 8px; font-weight: bold; background: #333; color: #fff; padding: 0.5px 3px; border-radius: 2px; }}
+    .cod-box {{ font-size: {tamanho_fonte - 1}px; font-weight: bold; background: #333; color: #fff; padding: 0.5px 3px; border-radius: 2px; }}
+    
     .bloco-central {{ display: flex; flex-direction: column; justify-content: center; height: 11mm; }}
-    .linha {{ display: flex; justify-content: space-between; font-size: 8.5px; margin-bottom: 0.5mm; }}
+    
+    /* Configuração dinâmica do tamanho das fontes do conteúdo central */
+    .linha {{ 
+        display: flex; 
+        justify-content: space-between; 
+        font-size: {tamanho_fonte}px; 
+        margin-bottom: 0.5mm; 
+    }}
+    
     .lbl {{ font-weight: bold; color: #444; margin-right: 1px; }}
     .edit:hover {{ background: #fff9c4; cursor: pointer; }}
-    .bloco-preco {{ text-align: right; font-size: 10px; font-weight: bold; color: #1b5e20; height: 4mm; border-top: 1px solid #f5f5f5; }}
+    
+    /* Preço acompanha o crescimento da fonte proporcionalmente */
+    .bloco-preco {{ 
+        text-align: right; 
+        font-size: {tamanho_fonte + 1.5}px; 
+        font-weight: bold; 
+        color: #1b5e20; 
+        height: 4mm; 
+        border-top: 1px solid #f5f5f5; 
+    }}
 
     .btn-imprimir-real {{
         background-color: #2e7d32;
@@ -204,7 +222,7 @@ css_e_script = f"""
 """
 
 # Renderização Final do Painel
-st.subheader("👁️ Visualização da Folha (Etiquetas cinzas representam espaços que serão pulados)")
+st.subheader("👁️ Visualização da Folha (Use o controle deslizante para regular o tamanho)")
 html_final = f"{css_e_script}<div class='grade-etiquetas'>{html_etiquetas_completo}</div>"
 
 st.components.v1.html(html_final, height=700, scrolling=True)
