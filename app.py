@@ -2,9 +2,14 @@ import streamlit as st
 import base64
 from datetime import datetime, date
 import pandas as pd
+from io import BytesIO
+from reportlab.lib.pagesizes import a4
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle
+from reportlab.lib import colors
+from reportlab.graphics.shapes import Drawing, Image as RLImage, String
 
 # Configuração da página
-st.set_page_config(page_title="Gerador Pimaco Profissional", layout="wide")
+st.set_page_config(page_title="Gerador Pimaco PDF", layout="wide")
 
 # -------------------------------------------------------------------------
 # BANCO DE DADOS EM MEMÓRIA
@@ -17,16 +22,13 @@ if "banco_etiquetas" not in st.session_state:
 # -------------------------------------------------------------------------
 # INTERFACE PRINCIPAL
 # -------------------------------------------------------------------------
-st.title("🏷️ Gerador Pimaco A4354 Profissional")
+st.title("🏷️ Gerador Pimaco A4354 - Versão PDF")
 
-aba_etiquetas, aba_historico = st.tabs(["🖨️ Gerar e Imprimir", "📜 Histórico de Etiquetas Impressas"])
+aba_etiquetas, aba_historico = st.tabs(["🖨️ Gerar Etiquetas", "📜 Histórico de Etiquetas Impressas"])
 
-# -------------------------------------------------------------------------
-# ABA 2: HISTÓRICO DE IMPRESSÕES
-# -------------------------------------------------------------------------
+# ABA 2: HISTÓRICO
 with aba_historico:
     st.subheader("📋 Relatório de Etiquetas Já Emitidas")
-    
     if not st.session_state["banco_etiquetas"].empty:
         st.dataframe(st.session_state["banco_etiquetas"], use_container_width=True, hide_index=True)
         csv = st.session_state["banco_etiquetas"].to_csv(index=False).encode('utf-8-sig')
@@ -34,47 +36,25 @@ with aba_historico:
     else:
         st.info("Nenhuma etiqueta foi gravada no histórico desta sessão ainda.")
 
-# -------------------------------------------------------------------------
-# ABA 1: GERADOR DE ETIQUETAS
-# -------------------------------------------------------------------------
+# ABA 1: GERADOR
 with aba_etiquetas:
-    MODELOS_PIMACO = {
-        "Pimaco A4354 (25.4mm x 99.0mm - 22 etiq.)": {"largura": 99.0, "altura": 25.4, "colunas": 2, "linhas": 11, "margem_sup": 21.2, "margem_esq": 6.0, "gap_col": 10.0},
-        "Personalizado (Definir Manualmente)": {"largura": 80.0, "altura": 40.0, "colunas": 2, "linhas": 6, "margem_sup": 10.0, "margem_esq": 10.0, "gap_col": 3.0}
-    }
+    # Medidas oficiais da folha Pimaco A4354 convertidas para pontos (medida do PDF)
+    # 1 mm = 2.83465 pontos
+    LARGURA_ETIQ = 99.0 * 2.83465
+    ALTURA_ETIQ = 25.4 * 2.83465
+    MARGEM_SUP = 21.2 * 2.83465
+    MARGEM_ESQ = 6.0 * 2.83465
+    GAP_COL = 10.0 * 2.83465
+    COLUNAS = 2
+    LINHAS = 11
 
     col_dados, col_config = st.columns(2)
 
     with col_config:
-        st.subheader("📏 Configuração do Papel")
-        modelo_selecionado = st.selectbox("Selecione o Modelo da Folha:", list(MODELOS_PIMACO.keys()))
-        medidas = MODELOS_PIMACO[modelo_selecionado]
-        
-        largura = medidas["largura"]
-        altura = medidas["altura"]
-        colunas = medidas["colunas"]
-        linhas = medidas["linhas"]
-        margem_sup = medidas["margem_sup"]
-        margem_esq = medidas["margem_esq"]
-        gap_col = medidas["gap_col"]
-        capacidade_maxima = colunas * linhas
-        
-        st.success("Gabarito Ativo: " + str(largura) + "mm x " + str(altura) + "mm")
-
-        st.divider()
-        st.subheader("🖨️ Opções de Posição")
-        modo_impressao = st.radio("Formato:", ["Folha Completa / Múltiplas", "Apenas 1 Etiqueta Avançada"])
-        posicao_inicial = st.number_input("Começar a imprimir a partir de qual etiqueta?", min_value=1, max_value=capacidade_maxima, value=1)
-        
-        if modo_impressao == "Folha Completa / Múltiplas":
-            vagas_restantes = capacidade_maxima - (posicao_inicial - 1)
-            qtd_imprimir = st.number_input("Quantas etiquetas quer gerar?", min_value=1, max_value=vagas_restantes, value=vagas_restantes)
-        else:
-            qtd_imprimir = 1
-
-        st.divider()
-        st.subheader("🔤 Ajuste do Texto")
-        tamanho_fonte = st.slider("Tamanho da letra (pixels):", min_value=7, max_value=14, value=10, step=1)
+        st.subheader("⚙️ Opções de Posição")
+        posicao_inicial = st.number_input("Começar a imprimir a partir de qual etiqueta? (1 a 22)", min_value=1, max_value=22, value=1)
+        qtd_imprimir = st.number_input("Quantas etiquetas quer gerar?", min_value=1, max_value=23-posicao_inicial, value=23-posicao_inicial)
+        tamanho_fonte = st.slider("Tamanho da letra:", min_value=7, max_value=12, value=9, step=1)
 
     with col_dados:
         st.subheader("📝 Informações da Etiqueta")
@@ -90,72 +70,87 @@ with aba_etiquetas:
             valor = st.text_input("Valor RS", value="29,90")
             
         data_val = st.date_input("Data de Validade", date.today())
-        logo_file = st.file_uploader("Upload da Logomarca", type=["png", "jpg", "jpeg"])
+        logo_file = st.file_uploader("Upload da Logomarca (Opcional)", type=["png", "jpg", "jpeg"])
 
-    # Processamento do Logo
-    logo_html = ""
-    if logo_file is not None:
-        bytes_data = logo_file.read()
-        b64_logo = base64.b64encode(bytes_data).decode()
-        logo_html = '<img src="data:image/png;base64,' + b64_logo + '" style="max-height: 5.5mm; max-width: 35mm; object-fit: contain;">'
-    else:
-        logo_html = '<div style="font-size: 7px; color: #aaa; font-weight: bold; border: 1px dotted #ddd; padding: 1px 3px;">SUA MARCA</div>'
+    # -------------------------------------------------------------------------
+    # FUNÇÃO QUE CONSTRÓI A ETQUETA DENTRO DO PDF
+    # -------------------------------------------------------------------------
+    def desenhar_etiqueta(vazia=False):
+        # Cria um bloco de desenho do tamanho exato da etiqueta Pimaco
+        d = Drawing(LARGURA_ETIQ, ALTURA_ETIQ)
+        if vazia:
+            return d
+        
+        # Se tiver logo, processa a imagem para o PDF
+        if logo_file is not None:
+            logo_file.seek(0)
+            img_data = logo_file.read()
+            b64_img = base64.b64encode(img_data).decode()
+            d.add(RLImage(5, ALTURA_ETIQ - 20, 70, 15, f"data:image/png;base64,{b64_img}"))
+        else:
+            d.add(String(5, ALTURA_ETIQ - 15, "[SUA MARCA]", fontSize=7, fontName="Helvetica-Bold", fillColor=colors.lightgrey))
+        
+        # Injeta os textos nas posições horizontais e verticais corretas
+        d.add(String(LARGURA_ETIQ - 50, ALTURA_ETIQ - 15, str(codigo), fontSize=tamanho_fonte, fontName="Helvetica-Bold"))
+        d.add(String(5, ALTURA_ETIQ - 32, "Cor: " + str(nome_cor), fontSize=tamanho_fonte, fontName="Helvetica"))
+        d.add(String(130, ALTURA_ETIQ - 32, "Base: " + str(base), fontSize=tamanho_fonte, fontName="Helvetica"))
+        d.add(String(5, ALTURA_ETIQ - 48, "Qtd: " + str(quantidade), fontSize=tamanho_fonte, fontName="Helvetica"))
+        d.add(String(65, ALTURA_ETIQ - 48, "Lote: " + str(variacao), fontSize=tamanho_fonte, fontName="Helvetica"))
+        d.add(String(130, ALTURA_ETIQ - 48, "Val: " + data_val.strftime('%d/%m/%Y'), fontSize=tamanho_fonte, fontName="Helvetica"))
+        d.add(String(LARGURA_ETIQ - 55, 5, "RS " + str(valor), fontSize=tamanho_fonte + 2, fontName="Helvetica-Bold", fillColor=colors.HexColor("#1b5e20")))
+        return d
 
-    # Geração das etiquetas em HTML
-    def gerar_html_etiqueta(modo_print=False):
-        borda_css = "border: 1px transparent solid !important;" if modo_print else "border: 1px dashed #bbb;"
-        html = '<div class="etiqueta" style="width: ' + str(largura) + 'mm; height: ' + str(altura) + 'mm; background: white; ' + borda_css + ' padding: 1.5mm 2.5mm; font-family: Arial, sans-serif; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between; overflow: hidden; page-break-inside: avoid;">'
-        html += '    <div style="display: flex; justify-content: space-between; align-items: center; height: 6mm;">'
-        html += '        ' + logo_html
-        html += '        <div style="font-size: ' + str(tamanho_fonte - 1) + 'px; font-weight: bold; background: #333; color: #fff; padding: 0.5px 3px; border-radius: 2px;">' + str(codigo) + '</div>'
-        html += '    </div>'
-        html += '    <div style="display: flex; flex-direction: column; justify-content: center; height: 11mm;">'
-        html += '        <div style="display: flex; justify-content: space-between; font-size: ' + str(tamanho_fonte) + 'px; margin-bottom: 0.5mm; color: black;">'
-        html += '            <span><b>Cor:</b> ' + str(nome_cor) + '</span>'
-        html += '            <span><b>Base:</b> ' + str(base) + '</span>'
-        html += '        </div>'
-        html += '        <div style="display: flex; justify-content: space-between; font-size: ' + str(tamanho_fonte) + 'px; margin-bottom: 0.5mm; color: black;">'
-        html += '            <span><b>Qtd:</b> ' + str(quantidade) + '</span>'
-        html += '            <span><b>Lote:</b> ' + str(variacao) + '</span>'
-        html += '            <span><b>Data:</b> ' + data_val.strftime('%d/%m/%Y') + '</span>'
-        html += '        </div>'
-        html += '    </div>'
-        html += '    <div style="text-align: right; font-size: ' + str(tamanho_fonte + 2) + 'px; font-weight: bold; color: #1b5e20; height: 4mm; border-top: 1px solid #f5f5f5;">RS ' + str(valor) + '</div>'
-        html += '</div>'
-        return html
+    # -------------------------------------------------------------------------
+    # CONSTRUÇÃO DO ARQUIVO PDF COMPLETO
+    # -------------------------------------------------------------------------
+    buffer = BytesIO()
+    # Cria o documento A4 com margens zero para controlarmos via tabela interna
+    doc = SimpleDocTemplate(buffer, pagesize=a4, leftMargin=0, rightMargin=0, topMargin=0, bottomMargin=0)
+    
+    # Organiza a lista de etiquetas pulando as vazias iniciais
+    etiquetas_lista = []
+    for _ in range(posicao_inicial - 1):
+        etiquetas_lista.append(desenhar_etiqueta(vazia=True))
+    for _ in range(qtd_imprimir):
+        etiquetas_lista.append(desenhar_etiqueta(vazia=False))
+    while len(etiquetas_lista) < 22:
+        etiquetas_lista.append(desenhar_etiqueta(vazia=True))
 
-    def gerar_etiqueta_vazia(modo_print=False):
-        if modo_print:
-            return '<div style="width: ' + str(largura) + 'mm; height: ' + str(altura) + 'mm; background: transparent !important; border: none !important;"></div>'
-        return '<div style="width: ' + str(largura) + 'mm; height: ' + str(altura) + 'mm; background: #f0f2f6; border: 1px dotted #ccc; box-sizing: border-box;"></div>'
+    # Divide a lista em 11 linhas com 2 colunas cada
+    dados_grade = []
+    for i in range(0, 22, 2):
+        dados_grade.append([etiquetas_lista[i], etiquetas_lista[i+1]])
 
-    # Criação do lote para exibição na tela
-    lista_html_tela = []
-    for _ in range(posicao_inicial - 1): lista_html_tela.append(gerar_etiqueta_vazia(modo_print=False))
-    for _ in range(qtd_imprimir): lista_html_tela.append(gerar_html_etiqueta(modo_print=False))
-    while len(lista_html_tela) < capacidade_maxima: lista_html_tela.append(gerar_etiqueta_vazia(modo_print=False))
-    html_etiquetas_tela = "".join(lista_html_tela)
+    # Monta a estrutura de tabela aplicando os recuos milimétricos da Pimaco
+    tabela = Table(dados_grade, colWidths=[LARGURA_ETIQ, LARGURA_ETIQ])
+    tabela.setStyle(TableStyle([
+        ('LEFTPADDING', (0,0), (-1,-1), 0),
+        ('RIGHTPADDING', (0,0), (-1,-1), 0),
+        ('TOPPADDING', (0,0), (-1,-1), 0),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 0),
+        ('ALIGN', (0,0), (-1,-1), 'LEFT'),
+        ('VALIGN', (0,0), (-1,-1), 'TOP'),
+        # Separa as duas colunas aplicando o vão central de 10mm
+        ('RIGHTPADDING', (0,0), (0,-1), GAP_COL), 
+    ]))
 
-    # Criação do lote para a folha real da impressora
-    lista_html_print = []
-    for _ in range(posicao_inicial - 1): lista_html_print.append(gerar_etiqueta_vazia(modo_print=True))
-    for _ in range(qtd_imprimir): lista_html_print.append(gerar_html_etiqueta(modo_print=True))
-    while len(lista_html_print) < capacidade_maxima: lista_html_print.append(gerar_etiqueta_vazia(modo_print=True))
-    html_etiquetas_print = "".join(lista_html_print)
+    # Define a distância exata do topo e da lateral esquerda da folha A4
+    grade_com_margem = Table([[tabela]], colWidths=[a4[0]])
+    grade_com_margem.setStyle(TableStyle([
+        ('LEFTPADDING', (0,0), (-1,-1), MARGEM_ESQ),
+        ('TOPPADDING', (0,0), (-1,-1), MARGEM_SUP),
+    ]))
 
-    # Estilos de exibição na tela do Streamlit
-    css_tela = "<style>"
-    css_tela += "  .grade-etiquetas { display: grid; grid-template-columns: repeat(" + str(colunas) + ", " + str(largura) + "mm); gap: 1mm 3mm; padding: 5mm; background: #ffffff; border: 2px solid #ddd; border-radius: 8px; justify-content: start; width: fit-content; }"
-    css_tela += "</style>"
+    doc.build([grade_com_margem])
+    pdf_data = buffer.getvalue()
 
-    st.subheader("👁️ Visualização da Folha")
-    st.components.v1.html(css_tela + '<div class="grade-etiquetas">' + html_etiquetas_tela + '</div>', height=450, scrolling=True)
-
-    st.divider()
-    st.subheader("🖨️ Ações de Impressão")
-
-    # FUNÇÃO DE SALVAMENTO DISPARADA PELO BOTÃO PYTHON
-    def acao_salvar_historico():
+    # -------------------------------------------------------------------------
+    # BOTÃO ÚNICO DE SALVAMENTO E RELATÓRIO
+    # -------------------------------------------------------------------------
+    st.write("### 🖨️ Concluir Operação")
+    
+    # Toda vez que o usuário clicar para baixar o PDF, essa função roda nos bastidores salvando a linha na tabela
+    def registrar_e_imprimir():
         novo_registro = {
             "Data_Hora": datetime.now().strftime("%d/%m/%Y %H:%M"),
             "Codigo": codigo,
@@ -165,12 +160,16 @@ with aba_etiquetas:
             "Lote": variacao,
             "Valor": valor
         }
-        st.session_state["banco_etiquetas"] = pd.concat([st.session_state["banco_etiquetas"], pd.DataFrame([novo_registro])], ignore_index=True)
+        st.session_state["banco_etiquetas"] = pd.concat(
+            [st.session_state["banco_etiquetas"], pd.DataFrame([novo_registro])], 
+            ignore_index=True
+        )
 
-    st.button("💾 1º Passo: Gravar Dados no Histórico", on_click=acao_salvar_historico, help="Clique aqui primeiro para salvar as informações no seu relatório.")
-
-    # -------------------------------------------------------------------------
-    # DOCUMENTO DE IMPRESSÃO REFORMULADO (COM BOTÃO MANUAL DE DISPARO)
-    # -------------------------------------------------------------------------
-    html_impressao = '<html><head><meta charset="utf-8"><style>'
-    html_impressao += '@page { size: A4; margin: 0; }'
+    st.download_button(
+        label="💾 Salvar no Relatório e Baixar Folha em PDF",
+        data=pdf_data,
+        file_name="folha_etiquetas_pimaco.pdf",
+        mime="application/pdf",
+        on_click=registrar_e_imprimir,
+        help="Clique aqui para salvar os dados na planilha e gerar o arquivo de impressão perfeito."
+    )
