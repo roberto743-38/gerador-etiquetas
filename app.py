@@ -7,12 +7,34 @@ import pandas as pd
 st.set_page_config(page_title="Gerador Pimaco Profissional", layout="wide")
 
 # -------------------------------------------------------------------------
-# BANCO DE DADOS EM MEMÓRIA (Session State - Totalmente seguro na nuvem)
+# BANCO DE DADOS EM MEMÓRIA
 # -------------------------------------------------------------------------
 if "banco_etiquetas" not in st.session_state:
     st.session_state["banco_etiquetas"] = pd.DataFrame(
         columns=["Data_Hora", "Codigo", "Cor", "Base", "Quantidade", "Lote", "Valor"]
     )
+
+# Captura de dados vindo do clique do botão HTML
+query_params = st.query_params
+if "salvar_codigo" in query_params:
+    cod = query_params["salvar_codigo"]
+    # Verifica se já não foi salvo nesta última ação para não duplicar
+    novo_registro = {
+        "Data_Hora": datetime.now().strftime("%d/%m/%Y %H:%M"),
+        "Codigo": cod,
+        "Cor": query_params.get("salvar_cor", ""),
+        "Base": query_params.get("salvar_base", ""),
+        "Quantidade": query_params.get("salvar_qtd", ""),
+        "Lote": query_params.get("salvar_lote", ""),
+        "Valor": query_params.get("salvar_valor", "")
+    }
+    st.session_state["banco_etiquetas"] = pd.concat(
+        [st.session_state["banco_etiquetas"], pd.DataFrame([novo_registro])], 
+        ignore_index=True
+    )
+    # Limpa os parâmetros da URL para o app voltar ao normal
+    st.query_params.clear()
+    st.rerun()
 
 # -------------------------------------------------------------------------
 # INTERFACE PRINCIPAL
@@ -28,10 +50,7 @@ with aba_historico:
     st.subheader("📋 Relatório de Etiquetas Já Emitidas")
     
     if not st.session_state["banco_etiquetas"].empty:
-        # Exibe a tabela com os dados salvos
         st.dataframe(st.session_state["banco_etiquetas"], use_container_width=True, hide_index=True)
-        
-        # Transforma o histórico em um arquivo Excel/CSV para salvar no computador permanentemente
         csv = st.session_state["banco_etiquetas"].to_csv(index=False).encode('utf-8-sig')
         st.download_button(
             label="📥 Baixar Histórico em Excel (CSV)",
@@ -58,8 +77,8 @@ with aba_etiquetas:
         modelo_selecionado = st.selectbox("Selecione o Modelo da Folha:", list(MODELOS_PIMACO.keys()))
         medidas = MODELOS_PIMACO[modelo_selecionado]
         
-        largura, altura, colunas, linhas = medidas["largura"], medidas["altura"], medidas["colunas"], medidas["linhas"]
-        capacidade_maxima = colunas * linhas
+        largura, altura, colunas, lines = medidas["largura"], medidas["altura"], medidas["colunas"], medidas["linhas"]
+        capacidade_maxima = colunas * lines
         
         st.success("Gabarito Ativo: " + str(largura) + "mm x " + str(altura) + "mm")
 
@@ -141,46 +160,15 @@ with aba_etiquetas:
 
     html_etiquetas_completo = "".join(lista_html_final)
 
-    estilo_grade = 'display: grid; grid-template-columns: repeat(' + str(colunas) + ', ' + str(largura) + 'mm); gap: 1mm 3mm; padding: 5mm; background: #ffffff; border: 2px solid #ddd; border-radius: 8px; justify-content: start; width: fit-content;'
-    html_final_tela = '<div style="' + estilo_grade + '">' + html_etiquetas_completo + '</div>'
-
-    st.subheader("👁️ Visualização da Folha")
-    st.components.v1.html(html_final_tela, height=450, scrolling=True)
-
     # -------------------------------------------------------------------------
-    # SALVAMENTO E IMPRESSÃO
+    # LAYOUT VISUAL E IMPRESSÃO DIRETAMENTE INJETADOS (SEM IFRAME)
     # -------------------------------------------------------------------------
-    st.divider()
-    st.subheader("🖨️ Salvar no Banco e Imprimir")
-    
-    # Monta a estrutura da folha A4 limpa para a impressora física
-    html_impressao = '<html><head><meta charset="utf-8"><style>'
-    html_impressao += 'body { margin: 0; padding: 0; }'
-    html_impressao += '.grade { display: grid; grid-template-columns: repeat(' + str(colunas) + ', ' + str(largura) + 'mm) !important; gap: 0mm 3.5mm !important; position: absolute; left: 4mm; top: 10mm; }'
-    html_impressao += '</style></head><body onload="window.print()">'
-    
-    html_etiquetas_print = html_etiquetas_completo.replace('background: #f0f2f6; border: 1px dotted #ccc;', 'background: transparent; border: none;')
-    html_impressao += '<div class="grade">' + html_etiquetas_print + '</div></body></html>'
-    
-    # Botão com dupla função: Salva na planilha interna e abre o arquivo de impressão
-    if st.button("💾 Gravar no Histórico e Abrir Impressão"):
-        # Estrutura o novo registro
-        novo_registro = {
-            "Data_Hora": datetime.now().strftime("%d/%m/%Y %H:%M"),
-            "Codigo": codigo,
-            "Cor": nome_cor,
-            "Base": base,
-            "Quantidade": quantidade,
-            "Lote": variacao,
-            "Valor": valor
-        }
-        
-        # Insere a linha na tabela da aba 2
-        st.session_state["banco_etiquetas"] = pd.concat(
-            [st.session_state["banco_etiquetas"], pd.DataFrame([novo_registro])], 
-            ignore_index=True
-        )
-        st.success("Sucesso! Etiqueta registrada no histórico.")
-        
-        # Aciona o download automático da página de impressão
-        b64 = base64.b64encode(html_impressao.encode('utf-8-sig')).decode()
+    css_estilos = "<style>"
+    css_estilos += "  .grade-etiquetas { display: grid; grid-template-columns: repeat(" + str(colunas) + ", " + str(largura) + "mm); gap: 1mm 3mm; padding: 5mm; background: #ffffff; border: 2px solid #ddd; border-radius: 8px; justify-content: start; width: fit-content; }"
+    css_estilos += "  .btn-print-sistema { background-color: #2e7d32; color: white; border: none; padding: 12px 24px; font-size: 15px; font-weight: bold; border-radius: 4px; cursor: pointer; margin-top: 15px; display: inline-block; text-decoration: none; }"
+    css_estilos += "  .btn-print-sistema:hover { background-color: #1b5e20; }"
+    css_estilos += "  @media print {"
+    css_estilos += "    body *, header, footer, .stTabs, .stElementContainer, .stMarkdown, .stAlert, div[data-testid='stHeader'], div[class*='stSidebar'], .btn-print-sistema { visibility: hidden !important; height: 0 !important; margin: 0 !important; padding: 0 !important; }"
+    css_estilos += "    .grade-etiquetas, .grade-etiquetas * { visibility: visible !important; }"
+    css_estilos += "    .grade-etiquetas { position: absolute !important; left: 4mm !important; top: 10mm !important; background: white !important; border: none !important; grid-template-columns: repeat(" + str(colunas) + ", " + str(largura) + "mm) !important; gap: 0mm 3.5mm !important; padding: 0 !important; }"
+    css_estilos += "    .etiqueta { border: 1px transparent solid !important; page-break-inside: avoid; }"
