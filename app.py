@@ -18,7 +18,6 @@ if "banco_etiquetas" not in st.session_state:
 query_params = st.query_params
 if "salvar_codigo" in query_params:
     cod = query_params["salvar_codigo"]
-    # Verifica se já não foi salvo nesta última ação para não duplicar
     novo_registro = {
         "Data_Hora": datetime.now().strftime("%d/%m/%Y %H:%M"),
         "Codigo": cod,
@@ -32,7 +31,6 @@ if "salvar_codigo" in query_params:
         [st.session_state["banco_etiquetas"], pd.DataFrame([novo_registro])], 
         ignore_index=True
     )
-    # Limpa os parâmetros da URL para o app voltar ao normal
     st.query_params.clear()
     st.rerun()
 
@@ -77,8 +75,11 @@ with aba_etiquetas:
         modelo_selecionado = st.selectbox("Selecione o Modelo da Folha:", list(MODELOS_PIMACO.keys()))
         medidas = MODELOS_PIMACO[modelo_selecionado]
         
-        largura, altura, colunas, lines = medidas["largura"], medidas["altura"], medidas["colunas"], medidas["linhas"]
-        capacidade_maxima = colunas * lines
+        largura = medidas["largura"]
+        altura = medidas["altura"]
+        colunas = medidas["colunas"]
+        linhas = medidas["linhas"]
+        capacidade_maxima = colunas * linhas
         
         st.success("Gabarito Ativo: " + str(largura) + "mm x " + str(altura) + "mm")
 
@@ -160,9 +161,7 @@ with aba_etiquetas:
 
     html_etiquetas_completo = "".join(lista_html_final)
 
-    # -------------------------------------------------------------------------
-    # LAYOUT VISUAL E IMPRESSÃO DIRETAMENTE INJETADOS (SEM IFRAME)
-    # -------------------------------------------------------------------------
+    # Estilos CSS injetados de forma 100% visível na tela
     css_estilos = "<style>"
     css_estilos += "  .grade-etiquetas { display: grid; grid-template-columns: repeat(" + str(colunas) + ", " + str(largura) + "mm); gap: 1mm 3mm; padding: 5mm; background: #ffffff; border: 2px solid #ddd; border-radius: 8px; justify-content: start; width: fit-content; }"
     css_estilos += "  .btn-print-sistema { background-color: #2e7d32; color: white; border: none; padding: 12px 24px; font-size: 15px; font-weight: bold; border-radius: 4px; cursor: pointer; margin-top: 15px; display: inline-block; text-decoration: none; }"
@@ -172,3 +171,10 @@ with aba_etiquetas:
     css_estilos += "    .grade-etiquetas, .grade-etiquetas * { visibility: visible !important; }"
     css_estilos += "    .grade-etiquetas { position: absolute !important; left: 4mm !important; top: 10mm !important; background: white !important; border: none !important; grid-template-columns: repeat(" + str(colunas) + ", " + str(largura) + "mm) !important; gap: 0mm 3.5mm !important; padding: 0 !important; }"
     css_estilos += "    .etiqueta { border: 1px transparent solid !important; page-break-inside: avoid; }"
+    css_estilos += "    .etiqueta-vazia { border: 1px transparent solid !important; background: transparent !important; }"
+    css_estilos += "  }"
+    css_estilos += "</style>"
+
+    st.subheader("👁️ Visualização da Folha")
+    
+    # Renderização via markdown (Injeção segura sem usar iframes bloqueados)
