@@ -39,8 +39,8 @@ with aba_historico:
 # -------------------------------------------------------------------------
 with aba_etiquetas:
     MODELOS_PIMACO = {
-        "Pimaco A4354 (25.4mm x 99.0mm - 22 etiq.)": {"largura": 99.0, "altura": 25.4, "colunas": 2, "linhas": 11},
-        "Personalizado (Definir Manualmente)": {"largura": 80.0, "altura": 40.0, "colunas": 2, "linhas": 6}
+        "Pimaco A4354 (25.4mm x 99.0mm - 22 etiq.)": {"largura": 99.0, "altura": 25.4, "colunas": 2, "linhas": 11, "margem_sup": 21.2, "margem_esq": 6.0, "gap_col": 10.0},
+        "Personalizado (Definir Manualmente)": {"largura": 80.0, "altura": 40.0, "colunas": 2, "linhas": 6, "margem_sup": 10.0, "margem_esq": 10.0, "gap_col": 3.0}
     }
 
     col_dados, col_config = st.columns(2)
@@ -54,6 +54,9 @@ with aba_etiquetas:
         altura = medidas["altura"]
         colunas = medidas["colunas"]
         linhas = medidas["linhas"]
+        margem_sup = medidas["margem_sup"]
+        margem_esq = medidas["margem_esq"]
+        gap_col = medidas["gap_col"]
         capacidade_maxima = colunas * linhas
         
         st.success("Gabarito Ativo: " + str(largura) + "mm x " + str(altura) + "mm")
@@ -98,9 +101,10 @@ with aba_etiquetas:
     else:
         logo_html = '<div style="font-size: 7px; color: #aaa; font-weight: bold; border: 1px dotted #ddd; padding: 1px 3px;">SUA MARCA</div>'
 
-    # Geração das etiquetas em HTML
-    def gerar_html_etiqueta():
-        html = '<div class="etiqueta" style="width: ' + str(largura) + 'mm; height: ' + str(altura) + 'mm; background: white; border: 1px dashed #bbb; padding: 1.5mm 2.5mm; font-family: Arial, sans-serif; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between; overflow: hidden;">'
+    # Geração das etiquetas em HTML (Tela e Impressão compartilham a mesma base)
+    def gerar_html_etiqueta(modo_print=False):
+        borda_css = "border: 1px transparent solid !important;" if modo_print else "border: 1px dashed #bbb;"
+        html = '<div class="etiqueta" style="width: ' + str(largura) + 'mm; height: ' + str(altura) + 'mm; background: white; ' + borda_css + ' padding: 1.5mm 2.5mm; font-family: Arial, sans-serif; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between; overflow: hidden; page-break-inside: avoid;">'
         html += '    <div style="display: flex; justify-content: space-between; align-items: center; height: 6mm;">'
         html += '        ' + logo_html
         html += '        <div style="font-size: ' + str(tamanho_fonte - 1) + 'px; font-weight: bold; background: #333; color: #fff; padding: 0.5px 3px; border-radius: 2px;">' + str(codigo) + '</div>'
@@ -120,32 +124,32 @@ with aba_etiquetas:
         html += '</div>'
         return html
 
-    def gerar_etiqueta_vazia():
+    def gerar_etiqueta_vazia(modo_print=False):
+        if modo_print:
+            return '<div style="width: ' + str(largura) + 'mm; height: ' + str(altura) + 'mm; background: transparent !important; border: none !important;"></div>'
         return '<div style="width: ' + str(largura) + 'mm; height: ' + str(altura) + 'mm; background: #f0f2f6; border: 1px dotted #ccc; box-sizing: border-box;"></div>'
 
-    lista_html_final = []
-    for _ in range(posicao_inicial - 1):
-        lista_html_final.append(gerar_etiqueta_vazia())
-    for _ in range(qtd_imprimir):
-        lista_html_final.append(gerar_html_etiqueta())
-        
-    total_gerado = len(lista_html_final)
-    if total_gerado < capacidade_maxima:
-        for _ in range(capacidade_maxima - total_gerado):
-            lista_html_final.append(gerar_etiqueta_vazia())
+    # Criação do lote para exibição na tela
+    lista_html_tela = []
+    for _ in range(posicao_inicial - 1): lista_html_tela.append(gerar_etiqueta_vazia(modo_print=False))
+    for _ in range(qtd_imprimir): lista_html_tela.append(gerar_html_etiqueta(modo_print=False))
+    while len(lista_html_tela) < capacidade_maxima: lista_html_tela.append(gerar_etiqueta_vazia(modo_print=False))
+    html_etiquetas_tela = "".join(lista_html_tela)
 
-    html_etiquetas_completo = "".join(lista_html_final)
+    # Criação do lote para a folha real da impressora (com fundos transparentes)
+    lista_html_print = []
+    for _ in range(posicao_inicial - 1): lista_html_print.append(gerar_etiqueta_vazia(modo_print=True))
+    for _ in range(qtd_imprimir): lista_html_print.append(gerar_html_etiqueta(modo_print=True))
+    while len(lista_html_print) < capacidade_maxima: lista_html_print.append(gerar_etiqueta_vazia(modo_print=True))
+    html_etiquetas_print = "".join(lista_html_print)
 
-    # Estilos CSS injetados de forma estável
-    css_estilos = "<style>"
-    css_estilos += "  .grade-etiquetas { display: grid; grid-template-columns: repeat(" + str(colunas) + ", " + str(largura) + "mm); gap: 1mm 3mm; padding: 5mm; background: #ffffff; border: 2px solid #ddd; border-radius: 8px; justify-content: start; width: fit-content; }"
-    css_estilos += "</style>"
+    # Estilos de exibição na tela do Streamlit
+    css_tela = "<style>"
+    css_tela += "  .grade-etiquetas { display: grid; grid-template-columns: repeat(" + str(colunas) + ", " + str(largura) + "mm); gap: 1mm 3mm; padding: 5mm; background: #ffffff; border: 2px solid #ddd; border-radius: 8px; justify-content: start; width: fit-content; }"
+    css_tela += "</style>"
 
     st.subheader("👁️ Visualização da Folha")
-    
-    # Exibe a pré-visualização das etiquetas na tela de forma limpa e nativa
-    html_final_tela = css_estilos + '<div class="grade-etiquetas">' + html_etiquetas_completo + '</div>'
-    st.components.v1.html(html_final_tela, height=450, scrolling=True)
+    st.components.v1.html(css_tela + '<div class="grade-etiquetas">' + html_etiquetas_tela + '</div>', height=450, scrolling=True)
 
     st.divider()
     st.subheader("🖨️ Ações de Impressão")
@@ -163,17 +167,9 @@ with aba_etiquetas:
         }
         st.session_state["banco_etiquetas"] = pd.concat([st.session_state["banco_etiquetas"], pd.DataFrame([novo_registro])], ignore_index=True)
 
-    # Botão de salvar no relatório usando lógica nativa Python
     st.button("💾 1º Passo: Gravar Dados no Histórico", on_click=acao_salvar_historico, help="Clique aqui primeiro para salvar as informações no seu relatório.")
 
-    # HTML de Impressão limpo para o arquivo externo
+    # -------------------------------------------------------------------------
+    # GERAÇÃO DO DOCUMENTO DE IMPRESSÃO COM MARGENS OFICIAIS PIMACO A4354
+    # -------------------------------------------------------------------------
     html_impressao = '<html><head><meta charset="utf-8"><style>'
-    html_impressao += 'body { margin: 0; padding: 0; }'
-    html_impressao += '.grade { display: grid; grid-template-columns: repeat(' + str(colunas) + ', ' + str(largura) + 'mm) !important; gap: 0mm 3.5mm !important; position: absolute; left: 4mm; top: 10mm; }'
-    html_impressao += '.etiqueta { background: white; border: 1px transparent solid !important; page-break-inside: avoid; }'
-    html_impressao += '</style></head><body onload="window.print()">'
-    html_etiquetas_print = html_etiquetas_completo.replace('background: #f0f2f6; border: 1px dotted #ccc;', 'background: transparent; border: none;')
-    html_impressao += '<div class="grade">' + html_etiquetas_print + '</div></body></html>'
-
-    # Botão de download nativo em linha única à prova de erros de parênteses
-    st.download_button(label="🖨️ 2º Passo: Abrir Folha para Impressão", data=html_impressao, file_name="folha_etiquetas.html", mime="text/html", help="Clique aqui para gerar o arquivo de impressão perfeito.")
