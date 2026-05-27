@@ -177,12 +177,4 @@ with aba_etiquetas:
         st.components.v1.html(link_html, height=0)
 import os
 
-# Seu código anterior continua aqui normalmente...
-
-# Código corrigido para executar comandos do terminal:
-os.system("git add requirements.txt")
-os.system('git commit -m "Adiciona dependencias"')
-os.system("git push")
-
-# Seu código posterior continua aqui normalmente...
 
