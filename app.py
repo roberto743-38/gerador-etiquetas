@@ -14,26 +14,6 @@ if "banco_etiquetas" not in st.session_state:
         columns=["Data_Hora", "Codigo", "Cor", "Base", "Quantidade", "Lote", "Valor"]
     )
 
-# Captura de dados vindo do clique do botão HTML
-query_params = st.query_params
-if "salvar_codigo" in query_params:
-    cod = query_params["salvar_codigo"]
-    novo_registro = {
-        "Data_Hora": datetime.now().strftime("%d/%m/%Y %H:%M"),
-        "Codigo": cod,
-        "Cor": query_params.get("salvar_cor", ""),
-        "Base": query_params.get("salvar_base", ""),
-        "Quantidade": query_params.get("salvar_qtd", ""),
-        "Lote": query_params.get("salvar_lote", ""),
-        "Valor": query_params.get("salvar_valor", "")
-    }
-    st.session_state["banco_etiquetas"] = pd.concat(
-        [st.session_state["banco_etiquetas"], pd.DataFrame([novo_registro])], 
-        ignore_index=True
-    )
-    st.query_params.clear()
-    st.rerun()
-
 # -------------------------------------------------------------------------
 # INTERFACE PRINCIPAL
 # -------------------------------------------------------------------------
@@ -161,20 +141,49 @@ with aba_etiquetas:
 
     html_etiquetas_completo = "".join(lista_html_final)
 
-    # Estilos CSS injetados de forma 100% visível na tela
+    # Estilos CSS injetados de forma estável
     css_estilos = "<style>"
     css_estilos += "  .grade-etiquetas { display: grid; grid-template-columns: repeat(" + str(colunas) + ", " + str(largura) + "mm); gap: 1mm 3mm; padding: 5mm; background: #ffffff; border: 2px solid #ddd; border-radius: 8px; justify-content: start; width: fit-content; }"
-    css_estilos += "  .btn-print-sistema { background-color: #2e7d32; color: white; border: none; padding: 12px 24px; font-size: 15px; font-weight: bold; border-radius: 4px; cursor: pointer; margin-top: 15px; display: inline-block; text-decoration: none; }"
-    css_estilos += "  .btn-print-sistema:hover { background-color: #1b5e20; }"
-    css_estilos += "  @media print {"
-    css_estilos += "    body *, header, footer, .stTabs, .stElementContainer, .stMarkdown, .stAlert, div[data-testid='stHeader'], div[class*='stSidebar'], .btn-print-sistema { visibility: hidden !important; height: 0 !important; margin: 0 !important; padding: 0 !important; }"
-    css_estilos += "    .grade-etiquetas, .grade-etiquetas * { visibility: visible !important; }"
-    css_estilos += "    .grade-etiquetas { position: absolute !important; left: 4mm !important; top: 10mm !important; background: white !important; border: none !important; grid-template-columns: repeat(" + str(colunas) + ", " + str(largura) + "mm) !important; gap: 0mm 3.5mm !important; padding: 0 !important; }"
-    css_estilos += "    .etiqueta { border: 1px transparent solid !important; page-break-inside: avoid; }"
-    css_estilos += "    .etiqueta-vazia { border: 1px transparent solid !important; background: transparent !important; }"
-    css_estilos += "  }"
     css_estilos += "</style>"
 
     st.subheader("👁️ Visualização da Folha")
     
-    # Renderização via markdown (Injeção segura sem usar iframes bloqueados)
+    # Exibe a pré-visualização das etiquetas na tela de forma limpa e nativa
+    html_final_tela = css_estilos + '<div class="grade-etiquetas">' + html_etiquetas_completo + '</div>'
+    st.components.v1.html(html_final_tela, height=450, scrolling=True)
+
+    st.divider()
+    st.subheader("🖨️ Ações de Impressão")
+
+    # -------------------------------------------------------------------------
+    # FUNÇÃO DE SALVAMENTO DISPARADA PELO BOTÃO PYTHON (À Prova de erros)
+    # -------------------------------------------------------------------------
+    def acao_salvar_historico():
+        novo_registro = {
+            "Data_Hora": datetime.now().strftime("%d/%m/%Y %H:%M"),
+            "Codigo": codigo,
+            "Cor": nome_cor,
+            "Base": base,
+            "Quantidade": quantidade,
+            "Lote": variacao,
+            "Valor": valor
+        }
+        st.session_state["banco_etiquetas"] = pd.concat(
+            [st.session_state["banco_etiquetas"], pd.DataFrame([novo_registro])], 
+            ignore_index=True
+        )
+
+    # Botão de salvar no relatório usando lógica nativa Python
+    st.button("💾 1º Passo: Gravar Dados no Histórico", on_click=acao_salvar_historico, help="Clique aqui primeiro para salvar as informações no seu relatório.")
+
+    # HTML de Impressão limpo para o arquivo externo
+    html_impressao = '<html><head><meta charset="utf-8"><style>'
+    html_impressao += 'body { margin: 0; padding: 0; }'
+    html_impressao += '.grade { display: grid; grid-template-columns: repeat(' + str(colunas) + ', ' + str(largura) + 'mm) !important; gap: 0mm 3.5mm !important; position: absolute; left: 4mm; top: 10mm; }'
+    html_impressao += '.etiqueta { background: white; border: 1px transparent solid !important; page-break-inside: avoid; }'
+    html_impressao += '</style></head><body onload="window.print()">'
+    html_etiquetas_print = html_etiquetas_completo.replace('background: #f0f2f6; border: 1px dotted #ccc;', 'background: transparent; border: none;')
+    html_impressao += '<div class="grade">' + html_etiquetas_print + '</div></body></html>'
+
+    # Botão de download nativo do Streamlit para abrir a folha de impressão
+    st.download_button(
