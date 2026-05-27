@@ -30,12 +30,7 @@ with aba_historico:
     if not st.session_state["banco_etiquetas"].empty:
         st.dataframe(st.session_state["banco_etiquetas"], use_container_width=True, hide_index=True)
         csv = st.session_state["banco_etiquetas"].to_csv(index=False).encode('utf-8-sig')
-        st.download_button(
-            label="📥 Baixar Histórico em Excel (CSV)",
-            data=csv,
-            file_name="historico_etiquetas.csv",
-            mime="text/csv"
-        )
+        st.download_button(label="📥 Baixar Histórico em Excel (CSV)", data=csv, file_name="historico_etiquetas.csv", mime="text/csv")
     else:
         st.info("Nenhuma etiqueta foi gravada no histórico desta sessão ainda.")
 
@@ -166,10 +161,7 @@ with aba_etiquetas:
             "Lote": variacao,
             "Valor": valor
         }
-        st.session_state["banco_etiquetas"] = pd.concat(
-            [st.session_state["banco_etiquetas"], pd.DataFrame([novo_registro])], 
-            ignore_index=True
-        )
+        st.session_state["banco_etiquetas"] = pd.concat([st.session_state["banco_etiquetas"], pd.DataFrame([novo_registro])], ignore_index=True)
 
     # Botão de salvar no relatório usando lógica nativa Python
     st.button("💾 1º Passo: Gravar Dados no Histórico", on_click=acao_salvar_historico, help="Clique aqui primeiro para salvar as informações no seu relatório.")
@@ -183,9 +175,5 @@ with aba_etiquetas:
     html_etiquetas_print = html_etiquetas_completo.replace('background: #f0f2f6; border: 1px dotted #ccc;', 'background: transparent; border: none;')
     html_impressao += '<div class="grade">' + html_etiquetas_print + '</div></body></html>'
 
-    # Botão de download nativo do Streamlit para abrir a folha de impressão
-    st.download_button(
-        label="🖨️ 2º Passo: Abrir Folha para Impressão",
-        data=html_impressao,
-        file_name="folha_etiquetas.html",
-        mime="text/html",
+    # Botão de download nativo em linha única à prova de erros de parênteses
+    st.download_button(label="🖨️ 2º Passo: Abrir Folha para Impressão", data=html_impressao, file_name="folha_etiquetas.html", mime="text/html", help="Clique aqui para gerar o arquivo de impressão perfeito.")
