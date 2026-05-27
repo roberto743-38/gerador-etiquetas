@@ -175,3 +175,6 @@ with aba_etiquetas:
         b64 = base64.b64encode(html_impressao.encode()).decode()
         link_html = '<a id="download_link" href="data:text/html;base64,' + b64 + '" download="folha_etiquetas.html" style="display:none;"></a><script>document.getElementById("download_link").click();</script>'
         st.components.v1.html(link_html, height=0)
+git add requirements.txt
+git commit -m "Adiciona dependencias"
+git push
