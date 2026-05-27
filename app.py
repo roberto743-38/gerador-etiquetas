@@ -101,7 +101,7 @@ with aba_etiquetas:
     else:
         logo_html = '<div style="font-size: 7px; color: #aaa; font-weight: bold; border: 1px dotted #ddd; padding: 1px 3px;">SUA MARCA</div>'
 
-    # Geração das etiquetas em HTML (Tela e Impressão compartilham a mesma base)
+    # Geração das etiquetas em HTML
     def gerar_html_etiqueta(modo_print=False):
         borda_css = "border: 1px transparent solid !important;" if modo_print else "border: 1px dashed #bbb;"
         html = '<div class="etiqueta" style="width: ' + str(largura) + 'mm; height: ' + str(altura) + 'mm; background: white; ' + borda_css + ' padding: 1.5mm 2.5mm; font-family: Arial, sans-serif; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between; overflow: hidden; page-break-inside: avoid;">'
@@ -136,7 +136,7 @@ with aba_etiquetas:
     while len(lista_html_tela) < capacidade_maxima: lista_html_tela.append(gerar_etiqueta_vazia(modo_print=False))
     html_etiquetas_tela = "".join(lista_html_tela)
 
-    # Criação do lote para a folha real da impressora (com fundos transparentes)
+    # Criação do lote para a folha real da impressora
     lista_html_print = []
     for _ in range(posicao_inicial - 1): lista_html_print.append(gerar_etiqueta_vazia(modo_print=True))
     for _ in range(qtd_imprimir): lista_html_print.append(gerar_html_etiqueta(modo_print=True))
@@ -170,6 +170,7 @@ with aba_etiquetas:
     st.button("💾 1º Passo: Gravar Dados no Histórico", on_click=acao_salvar_historico, help="Clique aqui primeiro para salvar as informações no seu relatório.")
 
     # -------------------------------------------------------------------------
-    # GERAÇÃO DO DOCUMENTO DE IMPRESSÃO COM MARGENS OFICIAIS PIMACO A4354
+    # DOCUMENTO DE IMPRESSÃO REFORMULADO (COM BOTÃO MANUAL DE DISPARO)
     # -------------------------------------------------------------------------
     html_impressao = '<html><head><meta charset="utf-8"><style>'
+    html_impressao += '@page { size: A4; margin: 0; }'
