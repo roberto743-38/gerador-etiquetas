@@ -118,6 +118,7 @@ with aba_etiquetas:
         html += '        <div style="display: flex; justify-content: space-between; font-size: ' + str(tamanho_fonte) + 'px; margin-bottom: 0.5mm; color: black;">'
         html += '            <span><b>Qtd:</b> ' + str(quantidade) + '</span>'
         html += '            <span><b>Lote:</b> ' + str(variacao) + '</span>'
+        st.write("") # Correção interna para o fluxo
         html += '            <span><b>Data:</b> ' + data_val.strftime('%d/%m/%Y') + '</span>'
         html += '        </div>'
         html += '    </div>'
@@ -155,9 +156,7 @@ with aba_etiquetas:
     st.divider()
     st.subheader("🖨️ Ações de Impressão")
 
-    # -------------------------------------------------------------------------
-    # FUNÇÃO DE SALVAMENTO DISPARADA PELO BOTÃO PYTHON (À Prova de erros)
-    # -------------------------------------------------------------------------
+    # FUNÇÃO DE SALVAMENTO DISPARADA PELO BOTÃO PYTHON
     def acao_salvar_historico():
         novo_registro = {
             "Data_Hora": datetime.now().strftime("%d/%m/%Y %H:%M"),
@@ -185,5 +184,7 @@ with aba_etiquetas:
     html_etiquetas_print = html_etiquetas_completo.replace('background: #f0f2f6; border: 1px dotted #ccc;', 'background: transparent; border: none;')
     html_impressao += '<div class="grade">' + html_etiquetas_print + '</div></body></html>'
 
-    # Botão de download nativo do Streamlit para abrir a folha de impressão
+    # Botão de download nativo do Streamlit para abrir a folha de impressão (Fechamento corrigido)
     st.download_button(
+        label="🖨️ 2º Passo: Abrir Folha para Impressão",
+        data=html_impressao,
