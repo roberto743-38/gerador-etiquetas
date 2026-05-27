@@ -1,30 +1,23 @@
 import streamlit as st
 import base64
 from datetime import datetime, date
-from streamlit_gsheets import GSheetsConnection
 import pandas as pd
 
 # Configuração da página
 st.set_page_config(page_title="Gerador Pimaco Profissional", layout="wide")
 
 # -------------------------------------------------------------------------
-# CONEXÃO COM O BANCO DE DADOS (Google Sheets Permanente)
+# BANCO DE DADOS EM MEMÓRIA (Session State - Totalmente seguro na nuvem)
 # -------------------------------------------------------------------------
-# Se não estiver configurado na nuvem, criamos um banco temporário para não travar a tela
-try:
-    conn = st.connection("gsheets", type=GSheetsConnection)
-    df_banco = conn.read(ttl="0")
-    banco_ativo = True
-except Exception:
-    banco_ativo = False
-    if "banco_reserva" not in st.session_state:
-        st.session_state["banco_reserva"] = pd.DataFrame(columns=["Data_Hora", "Codigo", "Cor", "Base", "Quantidade", "Lote", "Valor"])
-    df_banco = st.session_state["banco_reserva"]
+if "banco_etiquetas" not in st.session_state:
+    st.session_state["banco_etiquetas"] = pd.DataFrame(
+        columns=["Data_Hora", "Codigo", "Cor", "Base", "Quantidade", "Lote", "Valor"]
+    )
 
 # -------------------------------------------------------------------------
 # INTERFACE PRINCIPAL
 # -------------------------------------------------------------------------
-st.title("🏷️ Gerador Pimaco A4354 com Histórico de Impressão")
+st.title("🏷️ Gerador Pimaco A4354 Profissional")
 
 aba_etiquetas, aba_historico = st.tabs(["🖨️ Gerar e Imprimir", "📜 Histórico de Etiquetas Impressas"])
 
@@ -33,10 +26,21 @@ aba_etiquetas, aba_historico = st.tabs(["🖨️ Gerar e Imprimir", "📜 Histó
 # -------------------------------------------------------------------------
 with aba_historico:
     st.subheader("📋 Relatório de Etiquetas Já Emitidas")
-    if not df_banco.empty:
-        st.dataframe(df_banco, use_container_width=True, hide_index=True)
+    
+    if not st.session_state["banco_etiquetas"].empty:
+        # Exibe a tabela com os dados salvos
+        st.dataframe(st.session_state["banco_etiquetas"], use_container_width=True, hide_index=True)
+        
+        # Transforma o histórico em um arquivo Excel/CSV para salvar no computador permanentemente
+        csv = st.session_state["banco_etiquetas"].to_csv(index=False).encode('utf-8-sig')
+        st.download_button(
+            label="📥 Baixar Histórico em Excel (CSV)",
+            data=csv,
+            file_name="historico_etiquetas.csv",
+            mime="text/csv"
+        )
     else:
-        st.info("Nenhuma etiqueta foi impressa ou registrada ainda.")
+        st.info("Nenhuma etiqueta foi gravada no histórico desta sessão ainda.")
 
 # -------------------------------------------------------------------------
 # ABA 1: GERADOR DE ETIQUETAS
@@ -101,7 +105,7 @@ with aba_etiquetas:
 
     # Geração das etiquetas em HTML
     def gerar_html_etiqueta():
-        html = '<div style="width: ' + str(largura) + 'mm; height: ' + str(altura) + 'mm; background: white; border: 1px dashed #bbb; padding: 1.5mm 2.5mm; font-family: Arial, sans-serif; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between; overflow: hidden;">'
+        html = '<div class="etiqueta" style="width: ' + str(largura) + 'mm; height: ' + str(altura) + 'mm; background: white; border: 1px dashed #bbb; padding: 1.5mm 2.5mm; font-family: Arial, sans-serif; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between; overflow: hidden;">'
         html += '    <div style="display: flex; justify-content: space-between; align-items: center; height: 6mm;">'
         html += '        ' + logo_html
         html += '        <div style="font-size: ' + str(tamanho_fonte - 1) + 'px; font-weight: bold; background: #333; color: #fff; padding: 0.5px 3px; border-radius: 2px;">' + str(codigo) + '</div>'
@@ -144,15 +148,23 @@ with aba_etiquetas:
     st.components.v1.html(html_final_tela, height=450, scrolling=True)
 
     # -------------------------------------------------------------------------
-    # SALVAMENTO E IMPRESSÃO (Disparado pelo botão)
+    # SALVAMENTO E IMPRESSÃO
     # -------------------------------------------------------------------------
     st.divider()
-    st.subheader("🖨️ Salvar e Imprimir")
+    st.subheader("🖨️ Salvar no Banco e Imprimir")
     
-    html_impressao = '<html><body onload="window.print()"><div style="display: grid; grid-template-columns: repeat(' + str(colunas) + ', ' + str(largura) + 'mm); gap: 0mm 3.5mm; position: absolute; left: 4mm; top: 10mm;">' + html_etiquetas_completo.replace('background: #f0f2f6; border: 1px dotted #ccc;', 'background: transparent; border: none;') + '</div></body></html>'
+    # Monta a estrutura da folha A4 limpa para a impressora física
+    html_impressao = '<html><head><meta charset="utf-8"><style>'
+    html_impressao += 'body { margin: 0; padding: 0; }'
+    html_impressao += '.grade { display: grid; grid-template-columns: repeat(' + str(colunas) + ', ' + str(largura) + 'mm) !important; gap: 0mm 3.5mm !important; position: absolute; left: 4mm; top: 10mm; }'
+    html_impressao += '</style></head><body onload="window.print()">'
     
-    # Novo Botão Único que executa a ação de Salvar no Banco antes de liberar a impressão
-    if st.button("💾 Registrar no Histórico e Gerar Impressão"):
+    html_etiquetas_print = html_etiquetas_completo.replace('background: #f0f2f6; border: 1px dotted #ccc;', 'background: transparent; border: none;')
+    html_impressao += '<div class="grade">' + html_etiquetas_print + '</div></body></html>'
+    
+    # Botão com dupla função: Salva na planilha interna e abre o arquivo de impressão
+    if st.button("💾 Gravar no Histórico e Abrir Impressão"):
+        # Estrutura o novo registro
         novo_registro = {
             "Data_Hora": datetime.now().strftime("%d/%m/%Y %H:%M"),
             "Codigo": codigo,
@@ -163,18 +175,12 @@ with aba_etiquetas:
             "Valor": valor
         }
         
-        if banco_ativo:
-            df_atualizado = pd.concat([df_banco, pd.DataFrame([novo_registro])], ignore_index=True)
-            conn.update(data=df_atualizado)
-        else:
-            st.session_state["banco_reserva"] = pd.concat([st.session_state["banco_reserva"], pd.DataFrame([novo_registro])], ignore_index=True)
-            
-        st.success("Sucesso! Dados gravados no histórico.")
+        # Insere a linha na tabela da aba 2
+        st.session_state["banco_etiquetas"] = pd.concat(
+            [st.session_state["banco_etiquetas"], pd.DataFrame([novo_registro])], 
+            ignore_index=True
+        )
+        st.success("Sucesso! Etiqueta registrada no histórico.")
         
-        # Cria um link invisível para o usuário baixar a folha que foi salva
-        b64 = base64.b64encode(html_impressao.encode()).decode()
-        link_html = '<a id="download_link" href="data:text/html;base64,' + b64 + '" download="folha_etiquetas.html" style="display:none;"></a><script>document.getElementById("download_link").click();</script>'
-        st.components.v1.html(link_html, height=0)
-import os
-
-
+        # Aciona o download automático da página de impressão
+        b64 = base64.b64encode(html_impressao.encode('utf-8-sig')).decode()
